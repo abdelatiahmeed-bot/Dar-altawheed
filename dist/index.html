@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/assets/manifest-CmGDZUFI.json" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="دار التوحيد">
+    <meta name="theme-color" content="#637353">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/4358/4358667.png" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4358/4358667.png" />
+
+    <title>دار التوحيد - متابعة القرآن الكريم</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Cairo', 'sans-serif'],
+              serif: ['Amiri', 'serif'],
+            },
+            colors: {
+              // الألوان الجديدة: ورقي، زيتوني، ذهبي، بني غامق
+              paper: '#fdfbf7',     // خلفية البطاقات
+              texture: '#e3e0d6',   // خلفية التطبيق
+              primary: '#637353',   // الزيتوني (الأساسي)
+              primaryDark: '#526043',
+              secondary: '#c2a266', // الذهبي (الثانوي)
+              secondaryDark: '#b09055',
+              darkBrown: '#43302b', // النصوص
+              mutedBrown: '#8c7e74', // نصوص فرعية
+              // الاحتفاظ بالألوان الوظيفية للتنبيهات
+              emerald: {
+                50: '#ecfdf5',
+                100: '#d1fae5',
+                500: '#10b981',
+                600: '#059669',
+                700: '#047857',
+              },
+              red: {
+                50: '#fef2f2',
+                100: '#fee2e2',
+                500: '#ef4444',
+                600: '#dc2626',
+              }
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out',
+              'slide-up': 'slideUp 0.5s ease-out',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            }
+          },
+        },
+      }
+    </script>
+
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-DL6bc1Oc.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Co4bbRTx.css">
+</head>
+  <body class="bg-texture font-sans text-darkBrown antialiased selection:bg-secondary selection:text-white">
+    <div id="root"></div>
+</body>
+</html>
