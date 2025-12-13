@@ -1,123 +1,90 @@
-
-
 export enum Grade {
   EXCELLENT = 'ممتاز',
   VERY_GOOD = 'جيد جداً',
   GOOD = 'جيد',
   ACCEPTABLE = 'مقبول',
-  NEEDS_WORK = 'يحتاج إعادة',
+  NEEDS_WORK = 'ضعيف'
 }
 
-export type AssignmentType = 'SURAH' | 'JUZ' | 'RANGE' | 'MULTI';
-
 export interface MultiSurahDetail {
-  name: string;
-  grade?: Grade;
+    name: string;
+    grade?: Grade;
 }
 
 export interface QuranAssignment {
-  type: AssignmentType;
+  type: 'SURAH' | 'RANGE' | 'JUZ' | 'MULTI';
   name: string;
   endName?: string;
-  ayahFrom: number;
-  ayahTo: number;
+  ayahFrom?: number;
+  ayahTo?: number;
   juzNumber?: number;
-  multiSurahs?: MultiSurahDetail[]; // Changed to object array for individual grades
-  grade: Grade; // Overall grade or single assignment grade
+  grade?: Grade;
+  multiSurahs?: MultiSurahDetail[];
 }
 
-// --- UPDATED ATTENDANCE STRUCTURE ---
 export interface AttendanceRecord {
-  id: string;
-  arrival: string;
-  departure?: string;
+    id: string;
+    arrival: string;
+    departure?: string;
 }
-// ------------------------------------
 
 export interface QuizItem {
-  id: string;
-  question: string;
-  correctAnswer: string;
-  wrongAnswers: string[];
+    id: string;
+    question: string;
+    correctAnswer: string;
+    wrongAnswers: string[];
 }
 
 export interface AdabSession {
-  id: string; // Added ID for tracking
-  title: string; 
-  quizzes: QuizItem[]; 
-  date: string; // Added date for archive sorting
+    id: string;
+    title: string;
+    quizzes: QuizItem[];
+    date: string;
 }
 
 export interface DailyLog {
   id: string;
   date: string;
-  isAbsent?: boolean; 
-  isAdab?: boolean; 
-  
-  adabSession?: AdabSession; 
-  parentQuizScore?: number; 
-  parentQuizMax?: number; 
-  
-  jadeed?: QuranAssignment; 
-  murajaah?: QuranAssignment[]; 
-  attendance?: AttendanceRecord[]; // Changed to array
-  notes?: string;
   teacherId: string;
   teacherName: string;
   seenByParent: boolean;
   seenAt?: string;
+  attendance?: AttendanceRecord[];
+  jadeed?: QuranAssignment;
+  murajaah?: QuranAssignment[];
+  notes?: string;
+  isAbsent?: boolean;
+  isAdab?: boolean;
+  adabSession?: AdabSession;
+  parentQuizScore?: number;
+  parentQuizMax?: number;
 }
 
-export interface Payment {
+export interface WeeklyEvent {
   id: string;
-  title: string; 
-  amount: number;
-  date: string;
-  recordedBy: string; 
-  notes?: string; 
-}
-
-export interface CalendarEvent {
-  id: string;
-  title: string; 
-  time: string;  
+  title: string;
+  time: string;
 }
 
 export interface WeeklySchedule {
-  day: string; 
-  events: CalendarEvent[]; 
-  isDayOff?: boolean; 
+  day: string;
+  isDayOff?: boolean;
+  events?: WeeklyEvent[];
 }
 
-export interface Student {
-  id: string;
-  teacherId: string; 
-  name: string;
-  parentCode: string; 
-  parentPhone?: string; 
-  logs: DailyLog[];
-  payments: Payment[];
-  weeklySchedule: WeeklySchedule[];
-  nextPlan?: { 
-    jadeed: QuranAssignment;
-    murajaah: QuranAssignment[];
-  }; 
-  calculatorNotes?: string; 
-  isFeeOverdue?: boolean; 
+export interface Payment {
+    id: string;
+    amount: number;
+    date: string;
+    title: string;
+    recordedBy: string;
+    notes?: string;
 }
-
-export interface Teacher {
-  id: string;
-  name: string;
-  loginCode: string; 
-}
-
-export type AnnouncementType = 'EXAM' | 'COMPETITION' | 'GENERAL';
 
 export interface ExamDayDetail {
     id: string;
     date: string;
-    description: string; // What to recite (e.g. Jadeed, Review)
+    description: string;
 }
 
 export interface Announcement {
@@ -126,8 +93,7 @@ export interface Announcement {
   teacherName: string;
   content: string;
   date: string;
-  type: AnnouncementType;
-  // Specific for Exams
+  type?: 'GENERAL' | 'EXAM';
   examDetails?: {
       testerTeacherId: string;
       testerTeacherName: string;
@@ -135,16 +101,41 @@ export interface Announcement {
   };
 }
 
-export type UserRole = 'TEACHER' | 'PARENT' | 'ADMIN' | 'GUEST';
+export interface NextPlan {
+    jadeed: QuranAssignment;
+    murajaah: QuranAssignment[];
+}
+
+export interface Student {
+  id: string;
+  teacherId: string;
+  name: string;
+  parentCode: string;
+  parentPhone?: string;
+  logs: DailyLog[];
+  weeklySchedule: WeeklySchedule[];
+  payments: Payment[];
+  isFeeOverdue?: boolean;
+  nextPlan?: NextPlan;
+  calculatorNotes?: string;
+}
+
+export interface Teacher {
+  id: string;
+  name: string;
+  loginCode: string;
+}
+
+export interface User {
+  role: 'GUEST' | 'PARENT' | 'TEACHER' | 'ADMIN';
+  id?: string;
+  name?: string;
+}
 
 export interface AppState {
   students: Student[];
   teachers: Teacher[];
   announcements: Announcement[];
-  adabArchive: AdabSession[]; // New: Store published Adab lessons
-  currentUser: {
-    role: UserRole;
-    id?: string; 
-    name?: string; 
-  };
+  adabArchive: AdabSession[];
+  currentUser: User;
 }

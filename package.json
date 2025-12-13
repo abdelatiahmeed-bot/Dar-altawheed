@@ -1,5 +1,5 @@
 {
-  "name": "copy3-of-the-basic-of-dar-al-tawheed---quran-tracker",
+  "name": "the-basic-of-dar-al-tawheed---quran-tracker",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -13,7 +13,7 @@
     "firebase": "^12.6.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.4.1"
+    "recharts": "^3.5.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
