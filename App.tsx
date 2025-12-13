@@ -1,11 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
-import { Student, AppState, UserRole, Teacher, DailyLog, Announcement, QuizItem, AdabSession } from '../types';
-import { INITIAL_STUDENTS, INITIAL_TEACHERS, DAYS_OF_WEEK, APP_VERSION } from '../constants';
-import { TeacherDashboard } from './TeacherDashboard';
-import { ParentDashboard } from './ParentDashboard';
-import { AdminDashboard } from './AdminDashboard';
-import { Button } from './Button';
+// نستدعي الأنواع من نفس المجلد (لأننا أصبحنا بجانبها)
+import { Student, AppState, UserRole, Teacher, DailyLog, Announcement, QuizItem, AdabSession } from './types';
+import { INITIAL_STUDENTS, INITIAL_TEACHERS, DAYS_OF_WEEK, APP_VERSION } from './constants';
+
+// نستدعي المكونات من داخل المجلد (لأننا أصبحنا خارجه)
+import { TeacherDashboard } from './components/TeacherDashboard';
+import { ParentDashboard } from './components/ParentDashboard';
+import { AdminDashboard } from './components/AdminDashboard';
+import { Button } from './components/Button';
 
 // Logo Component with Dynamic Title
 const Logo = ({ title }: { title: string }) => (
