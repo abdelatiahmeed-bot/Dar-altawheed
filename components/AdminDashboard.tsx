@@ -1,19 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
-import { Teacher, Student } from '../types';
+import { Teacher, Student, OrgSettings } from '../types';
 import { Button } from './Button';
 
 interface AdminDashboardProps {
   teachers: Teacher[];
-  // Added students prop to calculate counts
   students: Student[];
-  onAddTeacher: (name: string, loginCode: string) => void;
-  onUpdateTeacher: (id: string, name: string, loginCode: string) => void;
+  onAddTeacher: (name: string, loginCode: string, phone: string) => void;
+  onUpdateTeacher: (id: string, name: string, loginCode: string, phone: string) => void;
   onDeleteTeacher: (id: string) => void;
   onLogout: () => void;
   onShowNotification: (message: string, type: 'success' | 'error') => void;
-  organizationName: string;
-  onUpdateOrganizationName: (name: string) => void;
+  // Updated Props for Settings
+  orgSettings: OrgSettings;
+  onUpdateOrgSettings: (settings: OrgSettings) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -24,41 +24,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onDeleteTeacher, 
     onLogout, 
     onShowNotification,
-    organizationName,
-    onUpdateOrganizationName
+    orgSettings,
+    onUpdateOrgSettings
 }) => {
   const [name, setName] = useState('');
   const [loginCode, setLoginCode] = useState('');
+  const [phone, setPhone] = useState(''); 
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Modal State for Delete
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [teacherToDeleteId, setTeacherToDeleteId] = useState('');
 
-  // Local state for editing org name and password
-  const [tempOrgName, setTempOrgName] = useState(organizationName);
+  // Settings State
+  const [tempSettings, setTempSettings] = useState<OrgSettings>(orgSettings);
   const [newAdminPassword, setNewAdminPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name && loginCode) {
         if (editingId) {
-            onUpdateTeacher(editingId, name, loginCode);
+            onUpdateTeacher(editingId, name, loginCode, phone);
             setEditingId(null);
         } else {
-            onAddTeacher(name, loginCode);
+            onAddTeacher(name, loginCode, phone);
         }
         setName('');
         setLoginCode('');
+        setPhone('');
     }
   };
 
-  const handleOrgNameSubmit = (e: React.FormEvent) => {
+  const handleSettingsSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if(tempOrgName.trim()) {
-          onUpdateOrganizationName(tempOrgName);
-          onShowNotification('تم تحديث اسم المؤسسة بنجاح', 'success');
-      }
+      onUpdateOrgSettings(tempSettings);
+      onShowNotification('تم تحديث إعدادات المؤسسة والتصميم بنجاح', 'success');
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -76,6 +76,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setEditingId(t.id);
       setName(t.name);
       setLoginCode(t.loginCode);
+      setPhone(t.phone || '');
       const el = document.getElementById('teacher-form');
       if(el) el.scrollIntoView({ behavior: 'smooth' });
   };
@@ -84,6 +85,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setEditingId(null);
       setName('');
       setLoginCode('');
+      setPhone('');
   };
 
   const handleDeleteSubmit = (e: React.FormEvent) => {
@@ -105,21 +107,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Global Settings Section */}
         <div className="bg-white rounded-xl p-6 shadow-lg mb-6 relative border-l-4 border-purple-500 space-y-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">🏠 إعدادات التطبيق العامة</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">🏠 هوية وتصميم التطبيق</h2>
             
-            {/* Org Name */}
-            <form onSubmit={handleOrgNameSubmit} className="flex gap-4 items-end border-b pb-6">
-                <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">اسم الدار / المؤسسة (يظهر في شاشة الدخول)</label>
+            <form onSubmit={handleSettingsSubmit} className="space-y-4 border-b pb-6">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">اسم الدار / المؤسسة</label>
                     <input 
                         type="text" 
-                        value={tempOrgName} 
-                        onChange={e => setTempOrgName(e.target.value)}
+                        value={tempSettings.name} 
+                        onChange={e => setTempSettings({...tempSettings, name: e.target.value})}
                         className="w-full p-2 border rounded focus:ring-2 focus:ring-purple-500"
-                        placeholder="مثال: دار النور لتحفيظ القرآن"
+                        placeholder="مثال: دار التوحيد"
                     />
                 </div>
-                <Button type="submit" className="bg-purple-600 hover:bg-purple-700 h-10">حفظ الاسم</Button>
+                
+                <div className="grid grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">نوع الخط</label>
+                        <select 
+                            value={tempSettings.font}
+                            onChange={e => setTempSettings({...tempSettings, font: e.target.value as any})}
+                            className="w-full p-2 border rounded text-sm"
+                        >
+                            <option value="Amiri">خط أميري (نسخ)</option>
+                            <option value="Cairo">خط كايرو (حديث)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">لون الثيم</label>
+                        <select 
+                            value={tempSettings.colorTheme}
+                            onChange={e => setTempSettings({...tempSettings, colorTheme: e.target.value as any})}
+                            className="w-full p-2 border rounded text-sm"
+                        >
+                            <option value="Gold">ذهبي وأخضر (افتراضي)</option>
+                            <option value="Green">أخضر غامق</option>
+                            <option value="Blue">أزرق رسمي</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">نمط الشعار</label>
+                        <select 
+                            value={tempSettings.styleType}
+                            onChange={e => setTempSettings({...tempSettings, styleType: e.target.value as any})}
+                            className="w-full p-2 border rounded text-sm"
+                        >
+                            <option value="Calligraphy">مزخرف متداخل</option>
+                            <option value="Modern">بسيط وحديث</option>
+                            <option value="Simple">نص عادي</option>
+                        </select>
+                    </div>
+                </div>
+
+                <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700">حفظ إعدادات التصميم</Button>
             </form>
 
             {/* Admin Password */}
@@ -134,7 +174,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         placeholder="أدخل كلمة المرور الجديدة"
                     />
                 </div>
-                <Button type="submit" variant="secondary" className="h-10">تحديث كلمة المرور</Button>
+                {/* Changed variant/color here as requested */}
+                <Button type="submit" className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white">تحديث كلمة المرور</Button>
             </form>
         </div>
 
@@ -186,6 +227,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     />
                 </div>
                 <div>
+                    <label className="block text-sm font-medium text-gray-700">رقم الهاتف (للتواصل مع ولي الأمر)</label>
+                    <input 
+                        type="text" 
+                        value={phone} 
+                        onChange={e => setPhone(e.target.value)}
+                        className="w-full p-2 border rounded"
+                        placeholder="01xxxxxxxxx"
+                    />
+                </div>
+                <div>
                     <label className="block text-sm font-medium text-gray-700">رقم الدخول الخاص (Access Code)</label>
                     <input 
                         type="text" 
@@ -210,17 +261,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <p className="text-gray-500 text-center">لا يوجد محفظين.</p>
                 ) : (
                     teachers.map(t => {
-                        // Calculate student count per teacher
                         const studentCount = students.filter(s => s.teacherId === t.id).length;
                         return (
                             <div key={t.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border">
                                 <div>
                                     <p className="font-bold text-gray-800 flex items-center gap-2">
                                         {t.name}
-                                        {/* Display Count in semi-transparent font */}
                                         <span className="text-sm text-gray-400 font-normal">({studentCount} طالب)</span>
                                     </p>
-                                    <p className="text-sm text-gray-500 font-mono">كود الدخول: {t.loginCode}</p>
+                                    <p className="text-sm text-gray-500 font-mono">كود: {t.loginCode} | هاتف: {t.phone || 'غير مسجل'}</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button 
