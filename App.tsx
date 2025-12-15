@@ -6,8 +6,6 @@ import { TeacherDashboard } from './components/TeacherDashboard';
 import { ParentDashboard } from './components/ParentDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Button } from './components/Button';
-import { collection, onSnapshot, setDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
-import { db } from "./firebaseConfig";
 
 // --- COMPONENTS ---
 
@@ -86,69 +84,56 @@ const normalizeArabicNumbers = (str: string) => {
 };
 
 const App: React.FC = () => {
-  // --- DATA LOADING & STATE FROM FIREBASE ---
-  const [students, setStudents] = useState<Student[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [adabArchive, setAdabArchive] = useState<AdabSession[]>([]);
-  
-  // Org Settings State
-  const [orgSettings, setOrgSettings] = useState<OrgSettings>({ 
-      name: "دار التوحيد", 
-      font: 'Amiri', 
-      colorTheme: 'Gold', 
-      styleType: 'Calligraphy' 
+  // --- DATA LOADING & STATE FROM LOCAL STORAGE ---
+  const [students, setStudents] = useState<Student[]>(() => {
+      try {
+          const saved = localStorage.getItem('muhaffiz_students_v3');
+          return saved ? JSON.parse(saved) : INITIAL_STUDENTS;
+      } catch { return INITIAL_STUDENTS; }
   });
 
-  // FIREBASE LISTENERS
-  useEffect(() => {
-      // 1. Listen for Students
-      const unsubStudents = onSnapshot(collection(db, "students"), (snapshot) => {
-          const loadedStudents = snapshot.docs.map(doc => doc.data() as Student);
-          // If empty, consider initializing (Optional)
-          if(loadedStudents.length > 0) {
-              setStudents(loadedStudents);
-          } else {
-             // Fallback for demo purposes if DB is empty, use initial
-             // setStudents(INITIAL_STUDENTS); 
-          }
-      });
+  const [teachers, setTeachers] = useState<Teacher[]>(() => {
+      try {
+          const saved = localStorage.getItem('muhaffiz_teachers_v3');
+          return saved ? JSON.parse(saved) : INITIAL_TEACHERS;
+      } catch { return INITIAL_TEACHERS; }
+  });
 
-      // 2. Listen for Teachers
-      const unsubTeachers = onSnapshot(collection(db, "teachers"), (snapshot) => {
-          const loadedTeachers = snapshot.docs.map(doc => doc.data() as Teacher);
-          if(loadedTeachers.length > 0) setTeachers(loadedTeachers);
-          else {
-              // Fallback demo
-              // setTeachers(INITIAL_TEACHERS);
-          }
-      });
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+      try {
+          const saved = localStorage.getItem('muhaffiz_announcements_v3');
+          return saved ? JSON.parse(saved) : [];
+      } catch { return []; }
+  });
 
-      // 3. Listen for Announcements
-      const unsubAnnouncements = onSnapshot(collection(db, "announcements"), (snapshot) => {
-          setAnnouncements(snapshot.docs.map(doc => doc.data() as Announcement));
-      });
+  const [adabArchive, setAdabArchive] = useState<AdabSession[]>(() => {
+      try {
+          const saved = localStorage.getItem('muhaffiz_adab_archive_v3');
+          return saved ? JSON.parse(saved) : [];
+      } catch { return []; }
+  });
+  
+  // Org Settings State
+  const [orgSettings, setOrgSettings] = useState<OrgSettings>(() => {
+      try {
+          const saved = localStorage.getItem('muhaffiz_settings_v3');
+          return saved ? JSON.parse(saved) : { 
+              name: "دار التوحيد", 
+              font: 'Amiri', 
+              colorTheme: 'Gold', 
+              styleType: 'Calligraphy' 
+          };
+      } catch {
+          return { name: "دار التوحيد", font: 'Amiri', colorTheme: 'Gold', styleType: 'Calligraphy' };
+      }
+  });
 
-      // 4. Listen for Adab Archive
-      const unsubAdab = onSnapshot(collection(db, "adab_archive"), (snapshot) => {
-          setAdabArchive(snapshot.docs.map(doc => doc.data() as AdabSession));
-      });
-
-      // 5. Org Settings (stored as a single doc in settings collection)
-      const unsubSettings = onSnapshot(doc(db, "settings", "organization"), (doc) => {
-          if (doc.exists()) {
-              setOrgSettings(doc.data() as OrgSettings);
-          }
-      });
-
-      return () => {
-          unsubStudents();
-          unsubTeachers();
-          unsubAnnouncements();
-          unsubAdab();
-          unsubSettings();
-      };
-  }, []);
+  // PERSISTENCE EFFECTS
+  useEffect(() => { localStorage.setItem('muhaffiz_students_v3', JSON.stringify(students)); }, [students]);
+  useEffect(() => { localStorage.setItem('muhaffiz_teachers_v3', JSON.stringify(teachers)); }, [teachers]);
+  useEffect(() => { localStorage.setItem('muhaffiz_announcements_v3', JSON.stringify(announcements)); }, [announcements]);
+  useEffect(() => { localStorage.setItem('muhaffiz_adab_archive_v3', JSON.stringify(adabArchive)); }, [adabArchive]);
+  useEffect(() => { localStorage.setItem('muhaffiz_settings_v3', JSON.stringify(orgSettings)); }, [orgSettings]);
 
   useEffect(() => {
       document.title = `${orgSettings.name} - متابعة القرآن الكريم`;
@@ -264,14 +249,11 @@ const App: React.FC = () => {
       if (!cleanPhone || cleanPhone.length < 10) { setLoginError('يرجى كتابة رقم هاتف صحيح'); return; } 
       
       if (pendingStudentId) { 
-          const student = students.find(s => s.id === pendingStudentId); 
-          if (student) { 
-              const updatedStudent = { ...student, parentPhone: cleanPhone };
-              await updateStudent(updatedStudent);
-              setAppState(prev => ({ ...prev, currentUser: { role: 'PARENT', id: student.id, name: student.name } })); 
-              setShowPhoneSetup(false); 
-              setPendingStudentId(null); 
-          } 
+          const updatedStudent = { ...students.find(s => s.id === pendingStudentId)!, parentPhone: cleanPhone };
+          updateStudent(updatedStudent);
+          setAppState(prev => ({ ...prev, currentUser: { role: 'PARENT', id: updatedStudent.id, name: updatedStudent.name } })); 
+          setShowPhoneSetup(false); 
+          setPendingStudentId(null); 
       } 
   };
   
@@ -298,58 +280,43 @@ const App: React.FC = () => {
       setShowPhoneSetup(false); 
   };
 
-  // --- DATA OPERATIONS (FIREBASE) ---
-  const updateStudent = async (updatedStudent: Student) => { 
-      try {
-          await setDoc(doc(db, "students", updatedStudent.id), updatedStudent);
-      } catch (error) {
-          console.error("Error updating student:", error);
-          showNotification('فشل التحديث، تأكد من الاتصال', 'error');
-      }
+  // --- DATA OPERATIONS (LOCAL STORAGE) ---
+  const updateStudent = (updatedStudent: Student) => { 
+      setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
   };
   
-  const deleteStudents = async (studentIds: string[]) => { 
-      try {
-          // Process deletions sequentially or with Promise.all
-          await Promise.all(studentIds.map(id => deleteDoc(doc(db, "students", id))));
-          showNotification('تم حذف الطالب بنجاح'); 
-      } catch(error) {
-          console.error("Error deleting students:", error);
-          showNotification('حدث خطأ أثناء الحذف', 'error');
-      }
+  const deleteStudents = (studentIds: string[]) => { 
+      setStudents(prev => prev.filter(s => !studentIds.includes(s.id)));
+      showNotification('تم حذف الطالب بنجاح'); 
   };
   
-  const markRemainingStudentsAbsent = async (absentIds: string[], excusedIds: string[]) => { 
+  const markRemainingStudentsAbsent = (absentIds: string[], excusedIds: string[]) => { 
     const teacherId = appState.currentUser.id || 'unknown'; 
     const teacherName = appState.currentUser.name || 'المعلم'; 
     
-    // Batch write logic is safer, but loop is simpler for now
-    const updates = students.filter(s => absentIds.includes(s.id) || excusedIds.includes(s.id)).map(student => {
-        let note = "";
-        if (absentIds.includes(student.id)) note = "غياب غير مبرر";
-        else note = "غائب بعذر - جزاكم الله خيراً على تبليغ الشيخ";
-        
-        const log: DailyLog = { 
-            id: 'absent_' + Date.now() + Math.random(), 
-            date: new Date().toISOString(), 
-            teacherId, 
-            teacherName, 
-            seenByParent: false, 
-            isAbsent: true, 
-            notes: note 
-        };
-        return { ...student, logs: [log, ...student.logs] };
-    });
-
-    try {
-        await Promise.all(updates.map(s => setDoc(doc(db, "students", s.id), s)));
-        showNotification(`تم تسجيل الغياب لـ ${updates.length} طالب`, 'success'); 
-    } catch (e) {
-        showNotification('حدث خطأ أثناء تسجيل الغياب', 'error');
-    }
+    setStudents(prev => prev.map(student => {
+        if (absentIds.includes(student.id) || excusedIds.includes(student.id)) {
+            let note = "";
+            if (absentIds.includes(student.id)) note = "غياب غير مبرر";
+            else note = "غائب بعذر - جزاكم الله خيراً على تبليغ الشيخ";
+            
+            const log: DailyLog = { 
+                id: 'absent_' + Date.now() + Math.random(), 
+                date: new Date().toISOString(), 
+                teacherId, 
+                teacherName, 
+                seenByParent: false, 
+                isAbsent: true, 
+                notes: note 
+            };
+            return { ...student, logs: [log, ...student.logs] };
+        }
+        return student;
+    }));
+    showNotification(`تم تسجيل الغياب لـ ${absentIds.length + excusedIds.length} طالب`, 'success'); 
   };
   
-  const addStudent = async (name: string, code: string) => { 
+  const addStudent = (name: string, code: string) => { 
       const newStudent: Student = { 
           id: 's_' + Date.now() + Math.random(), 
           teacherId: appState.currentUser.id || 't1', 
@@ -359,123 +326,96 @@ const App: React.FC = () => {
           payments: [], 
           logs: [] 
       }; 
-      try {
-          await setDoc(doc(db, "students", newStudent.id), newStudent);
-          return newStudent; 
-      } catch(e) {
-          showNotification('فشل إضافة الطالب', 'error');
-          throw e;
-      }
+      setStudents(prev => [newStudent, ...prev]);
+      return newStudent; 
   };
   
-  const addTeacher = async (name: string, loginCode: string, phone: string) => { 
+  const addTeacher = (name: string, loginCode: string, phone: string) => { 
       const newTeacher: Teacher = { id: 't_' + Date.now(), name, loginCode, phone }; 
-      try {
-          await setDoc(doc(db, "teachers", newTeacher.id), newTeacher);
-          showNotification('تم إضافة المحفظ بنجاح'); 
-      } catch(e) { showNotification('خطأ في الإضافة', 'error'); }
+      setTeachers(prev => [...prev, newTeacher]);
+      showNotification('تم إضافة المحفظ بنجاح'); 
   };
   
-  const updateTeacher = async (id: string, name: string, loginCode: string, phone: string) => { 
-      const teacher = teachers.find(t => t.id === id);
-      if(!teacher) return;
-      const updated = { ...teacher, name, loginCode, phone };
-      try {
-          await setDoc(doc(db, "teachers", id), updated);
-          showNotification('تم تعديل بيانات المحفظ بنجاح'); 
-      } catch(e) { showNotification('خطأ في التعديل', 'error'); }
+  const updateTeacher = (id: string, name: string, loginCode: string, phone: string) => { 
+      setTeachers(prev => prev.map(t => t.id === id ? { ...t, name, loginCode, phone } : t));
+      showNotification('تم تعديل بيانات المحفظ بنجاح'); 
   };
   
-  const deleteTeacher = async (id: string) => { 
-      try {
-          await deleteDoc(doc(db, "teachers", id));
-          showNotification('تم حذف المحفظ بنجاح'); 
-      } catch(e) { showNotification('خطأ في الحذف', 'error'); }
+  const deleteTeacher = (id: string) => { 
+      setTeachers(prev => prev.filter(t => t.id !== id));
+      showNotification('تم حذف المحفظ بنجاح'); 
   };
   
-  const markLogsAsSeen = async (studentId: string, logIds: string[]) => { 
-      const student = students.find(s => s.id === studentId); 
-      if (!student) return; 
-      const studentLogs = student.logs.map(log => { 
-          if (logIds.includes(log.id)) { return { ...log, seenByParent: true, seenAt: new Date().toISOString() }; } 
-          return log; 
-      }); 
-      const updatedStudent = { ...student, logs: studentLogs }; 
-      await updateStudent(updatedStudent); 
+  const markLogsAsSeen = (studentId: string, logIds: string[]) => { 
+      setStudents(prev => prev.map(s => {
+          if (s.id === studentId) {
+              const newLogs = s.logs.map(log => logIds.includes(log.id) ? { ...log, seenByParent: true, seenAt: new Date().toISOString() } : log);
+              return { ...s, logs: newLogs };
+          }
+          return s;
+      }));
       showNotification('تم تأكيد الاطلاع', 'success'); 
   };
   
-  const addAnnouncement = async (ann: Announcement) => { 
-      try {
-          await setDoc(doc(db, "announcements", ann.id), ann);
-      } catch(e) { console.error(e); }
+  const addAnnouncement = (ann: Announcement) => { 
+      setAnnouncements(prev => [ann, ...prev]);
   };
   
-  const deleteAnnouncement = async (id: string) => { 
-      try {
-          await deleteDoc(doc(db, "announcements", id));
-          showNotification('تم حذف الإعلان'); 
-      } catch(e) { console.error(e); }
+  const deleteAnnouncement = (id: string) => { 
+      setAnnouncements(prev => prev.filter(a => a.id !== id));
+      showNotification('تم حذف الإعلان'); 
   };
   
-  const updateOrgSettings = async (settings: OrgSettings) => {
-      try {
-          setOrgSettings(settings); // Optimistic UI
-          await setDoc(doc(db, "settings", "organization"), settings);
-      } catch(e) {
-          showNotification('فشل حفظ الإعدادات', 'error');
-      }
+  const updateOrgSettings = (settings: OrgSettings) => {
+      setOrgSettings(settings);
   };
 
-  const handlePublishAdab = async (title: string, quizzes: QuizItem[]) => { 
+  const handlePublishAdab = (title: string, quizzes: QuizItem[]) => { 
       const teacherId = appState.currentUser.id; const teacherName = appState.currentUser.name || 'المعلم'; if (!teacherId) return;
       const todayIso = new Date().toISOString(); const todayDateStr = new Date().toDateString(); const newSessionId = 'adab_sess_' + Date.now();
       
       const newAnnouncement: Announcement = { id: 'ann_' + Date.now(), teacherId, teacherName, content: `***${title}\nيرجى من ولي الأمر مشاركة الطالب في حل أسئلة يوم الآداب الآن!`, date: todayIso, type: 'GENERAL' }; 
-      await addAnnouncement(newAnnouncement);
+      addAnnouncement(newAnnouncement);
       
       const newAdabSession: AdabSession = { id: newSessionId, title, quizzes, date: todayIso }; 
-      await setDoc(doc(db, "adab_archive", newSessionId), newAdabSession);
+      setAdabArchive(prev => [newAdabSession, ...prev]);
       
       // Update students
-      const updates = students.filter(s => s.teacherId === teacherId).map(s => {
-          const existingLogIndex = s.logs.findIndex(l => new Date(l.date).toDateString() === todayDateStr); 
-          const adabSessionData: AdabSession = { id: newSessionId, title: title, quizzes: quizzes, date: todayIso }; 
-          
-          let updatedLogs = [...s.logs];
-          if (existingLogIndex >= 0) { 
-              updatedLogs[existingLogIndex] = { ...updatedLogs[existingLogIndex], isAdab: true, adabSession: adabSessionData, }; 
-          } else { 
-              const newLog: DailyLog = { id: 'adab_' + Date.now() + Math.random(), date: todayIso, teacherId, teacherName, isAbsent: false, isAdab: true, adabSession: adabSessionData, seenByParent: false, notes: "" }; 
-              updatedLogs = [newLog, ...s.logs]; 
+      setStudents(prev => prev.map(s => {
+          if (s.teacherId === teacherId) {
+              const existingLogIndex = s.logs.findIndex(l => new Date(l.date).toDateString() === todayDateStr); 
+              const adabSessionData: AdabSession = { id: newSessionId, title: title, quizzes: quizzes, date: todayIso }; 
+              
+              let updatedLogs = [...s.logs];
+              if (existingLogIndex >= 0) { 
+                  updatedLogs[existingLogIndex] = { ...updatedLogs[existingLogIndex], isAdab: true, adabSession: adabSessionData, }; 
+              } else { 
+                  const newLog: DailyLog = { id: 'adab_' + Date.now() + Math.random(), date: todayIso, teacherId, teacherName, isAbsent: false, isAdab: true, adabSession: adabSessionData, seenByParent: false, notes: "" }; 
+                  updatedLogs = [newLog, ...s.logs]; 
+              }
+              return { ...s, logs: updatedLogs };
           }
-          return { ...s, logs: updatedLogs };
-      });
-      
-      try {
-          await Promise.all(updates.map(s => setDoc(doc(db, "students", s.id), s)));
-      } catch(e) { console.error(e); }
+          return s;
+      }));
   };
   
-  const handleEditAdab = async (sessionId: string, title: string, quizzes: QuizItem[]) => { 
-      await updateDoc(doc(db, "adab_archive", sessionId), { title, quizzes });
+  const handleEditAdab = (sessionId: string, title: string, quizzes: QuizItem[]) => { 
+      setAdabArchive(prev => prev.map(s => s.id === sessionId ? { ...s, title, quizzes } : s));
       
-      const updates = students.filter(s => s.logs.some(l => l.adabSession?.id === sessionId)).map(student => { 
+      setStudents(prev => prev.map(student => { 
           const newLogs = student.logs.map(log => { 
               if (log.adabSession?.id === sessionId) { 
                   return { ...log, adabSession: { ...log.adabSession!, title, quizzes }, seenByParent: false, parentQuizScore: undefined, parentQuizMax: undefined }; 
               } return log; 
           }); 
           return { ...student, logs: newLogs }; 
-      });
-      
-      await Promise.all(updates.map(s => setDoc(doc(db, "students", s.id), s)));
+      }));
   };
   
-  const handleDeleteAdab = async (sessionId: string) => { 
-      await deleteDoc(doc(db, "adab_archive", sessionId));
+  const handleDeleteAdab = (sessionId: string) => { 
+      setAdabArchive(prev => prev.filter(s => s.id !== sessionId));
       
-      const updates = students.map(student => { 
+      setStudents(prev => prev.map(student => { 
           const newLogs = student.logs.map(log => { 
               if (log.adabSession?.id === sessionId) { 
                   if (log.isAbsent === false && !log.jadeed && !log.attendance) { return null; } 
@@ -483,9 +423,7 @@ const App: React.FC = () => {
               } return log; 
           }).filter(l => l !== null) as DailyLog[]; 
           return { ...student, logs: newLogs }; 
-      });
-      
-      await Promise.all(updates.map(s => setDoc(doc(db, "students", s.id), s)));
+      }));
       showNotification('تم حذف درس الآداب بنجاح', 'success');
   };
   

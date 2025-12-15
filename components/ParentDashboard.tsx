@@ -73,16 +73,30 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             if (a.expiresAt) {
                 if (new Date(a.expiresAt).getTime() < now.getTime()) return false;
             }
+
+            // 3. Adab Completion Check
+            // If announcement is about Adab (starts with ***), and we have a log for THAT day with completed quiz, hide it.
+            if (a.content.startsWith("***")) {
+                const adabLogForDate = student.logs.find(l => 
+                    l.isAdab && 
+                    new Date(l.date).toDateString() === new Date(a.date).toDateString()
+                );
+                
+                if (adabLogForDate && adabLogForDate.parentQuizScore !== undefined) {
+                    return false; // Hide if quiz done
+                }
+            }
+
             return true;
         });
 
-        // 3. Fee Reminder check
+        // 4. Fee Reminder check (Always show if feeReminder exists)
         if (student.feeReminder) {
             const feeAnnouncement: Announcement = {
                 id: `fee_${student.id}_${Date.now()}`,
                 teacherId: 'admin',
                 teacherName: 'الإدارة',
-                content: `تنبيه هام: يرجى سداد رسوم شهر ${student.feeReminder.month}`,
+                content: `الرجاء من سيادتكم التكرم بسداد رسوم شهر ${student.feeReminder.month} وجزاكم الله خيراً`,
                 date: student.feeReminder.dateSet,
                 type: 'FEE_REMINDER'
             };
@@ -90,7 +104,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         }
 
         return activeAnnouncements;
-    }, [announcements, student.teacherId, student.feeReminder]);
+    }, [announcements, student.teacherId, student.feeReminder, student.logs]);
 
     const handleSavePhone = () => {
         if(newPhone && newPhone.length >= 10) {
@@ -197,6 +211,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         if (currentQuizLog && currentQuizLog.adabSession && currentQuizLog.adabSession.quizzes[quizStep]) {
              const q = currentQuizLog.adabSession.quizzes[quizStep];
              const answers = [q.correctAnswer, ...q.wrongAnswers];
+             // Simple shuffle
              for (let i = answers.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [answers[i], answers[j]] = [answers[j], answers[i]];
@@ -261,7 +276,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 if (l.id === currentQuizLog.id) {
                     return { 
                         ...l, 
-                        parentQuizScore: currentScore,
+                        parentQuizScore: currentScore + (selectedAnswer === currentQuizLog.adabSession!.quizzes[quizStep].correctAnswer && quizStatus === 'RESULT' ? 0 : 0), // Score already updated in confirm
                         parentQuizMax: currentQuizLog.adabSession!.quizzes.length,
                         seenByParent: true,
                         seenAt: new Date().toISOString()
@@ -315,42 +330,39 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
              <div className="p-4 max-w-lg mx-auto animate-fade-in relative min-h-[60vh]">
                 
-                {/* Announcements Banner */}
+                {/* Announcements Banner Redesigned */}
                 {myAnnouncements.length > 0 && (
-                    <div className="mb-6 space-y-4">
+                    <div className="mb-6 space-y-3">
                         {myAnnouncements.map(ann => {
                             if (ann.type === 'FEE_REMINDER') {
                                 return (
-                                    <div key={ann.id} className="bg-red-50 border border-red-200 p-4 rounded-2xl relative shadow-md animate-pulse">
-                                        <span className="absolute -top-3 right-4 text-white text-[10px] px-2 py-1 rounded-full font-bold bg-red-600">
-                                            تذكير بالرسوم 💰
-                                        </span>
-                                        <p className="text-red-800 font-bold text-sm mt-2 text-center">{ann.content}</p>
+                                    <div key={ann.id} className="bg-white border-l-4 border-l-red-500 rounded-lg p-4 shadow-sm relative overflow-hidden flex items-start gap-3">
+                                        <div className="bg-red-50 p-2 rounded-full text-red-600 shrink-0 text-xl">💰</div>
+                                        <div>
+                                            <h4 className="font-bold text-red-700 text-sm mb-1">تذكير بالرسوم</h4>
+                                            <p className="text-gray-700 text-xs leading-relaxed font-semibold">{ann.content}</p>
+                                        </div>
                                     </div>
                                 );
                             }
                             
+                            const isExam = ann.type === 'EXAM';
                             return (
-                                <div key={ann.id} className={`p-4 rounded-2xl relative shadow-md border ${ann.type === 'EXAM' ? 'bg-amber-100 border-amber-300' : 'bg-[#e0dccf] border-[#c0baaa]'}`}>
-                                    <span className={`absolute -top-3 right-4 text-white text-[10px] px-2 py-1 rounded-full font-bold ${ann.type === 'EXAM' ? 'bg-amber-700' : 'bg-secondaryDark'}`}>
-                                        {ann.type === 'EXAM' ? 'اختبار شهر 📝' : 'تنبيه'}
-                                    </span>
-                                    
-                                    {ann.type === 'EXAM' ? (
-                                        <div className="mt-2">
-                                            <p className="text-xs text-amber-900 font-bold mb-2 text-center">جدول الاختبارات مع الشيخ {ann.teacherName}</p>
-                                            <div className="space-y-2">
-                                                <p className="text-darkBrown text-sm whitespace-pre-wrap leading-relaxed bg-white/70 p-3 rounded-xl border border-amber-200">
-                                                    {ann.content.replace("📢 **إعلان اختبار الشهر** 📢", "").trim()}
-                                                </p>
-                                            </div>
+                                <div key={ann.id} className={`bg-white border-l-4 rounded-lg p-4 shadow-sm relative flex items-start gap-3 ${isExam ? 'border-l-amber-500' : 'border-l-sky-500'}`}>
+                                    <div className={`p-2 rounded-full shrink-0 text-xl ${isExam ? 'bg-amber-50 text-amber-600' : 'bg-sky-50 text-sky-600'}`}>
+                                        {isExam ? '📝' : '📢'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className={`font-bold text-sm ${isExam ? 'text-amber-700' : 'text-sky-700'}`}>
+                                                {isExam ? 'جدول اختبارات' : `تنبيه من ${ann.teacherName}`}
+                                            </h4>
+                                            <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded">{formatSimpleDate(ann.date)}</span>
                                         </div>
-                                    ) : (
-                                        <>
-                                            <p className="text-xs text-gray-600 font-bold mb-1">{ann.teacherName}:</p>
-                                            <p className="text-darkBrown text-sm whitespace-pre-wrap font-bold">{ann.content}</p>
-                                        </>
-                                    )}
+                                        <p className="text-darkBrown text-sm whitespace-pre-wrap leading-relaxed">
+                                            {isExam ? ann.content.replace("📢 **إعلان اختبار الشهر** 📢", "").trim() : ann.content}
+                                        </p>
+                                    </div>
                                 </div>
                             );
                         })}
@@ -518,7 +530,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                             <div className="bg-red-50 border border-red-200 p-4 rounded-xl shadow-sm animate-pulse text-center">
                                 <h4 className="font-bold text-red-800 mb-2">🔔 رسالة من الإدارة</h4>
                                 <p className="text-sm text-red-700">
-                                    الرجاء التكرم بسداد شهر <strong>{student.feeReminder.month}</strong> وجزاكم الله خيراً.
+                                    الرجاء من سيادتكم التكرم بسداد رسوم شهر <strong>{student.feeReminder.month}</strong> وجزاكم الله خيراً.
                                 </p>
                             </div>
                         ) : (
@@ -611,4 +623,12 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                             const phone = teacherPhone || "201000000000"; 
                             window.open(`https://wa.me/${phone}`, '_blank');
                         }}
-                        className="bg-[#25D366] text-white p-3 rounded-full shadow-lg hover:bg-[#20b8
+                        className="bg-[#25D366] text-white p-3 rounded-full shadow-lg hover:bg-[#20b85a] transition-all transform hover:scale-110 flex items-center justify-center"
+                    >
+                        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="css-i6dzq1"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                    </button>
+                </div>
+             </div>
+        </div>
+    );
+};

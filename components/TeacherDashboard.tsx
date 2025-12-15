@@ -249,30 +249,32 @@ const AssignmentForm: React.FC<AssignmentFormProps> = ({
 };
 
 // --- ACTION BUTTON COMPONENT ---
-const ActionButton = ({ id, label, icon, isActive, onClick, colorClass }: { id: string, label: string, icon?: string, isActive: boolean, onClick: () => void, colorClass: string }) => (
+const ActionButton = ({ id, label, icon, isActive, onClick, colorClass, labelClassName }: { id: string, label: string, icon?: string, isActive: boolean, onClick: () => void, colorClass: string, labelClassName?: string }) => (
     <button 
         onClick={onClick}
-        className={`flex-1 py-4 px-2 rounded-2xl flex items-center justify-center gap-2 text-white font-bold text-sm sm:text-lg shadow-md transition-transform transform active:scale-95 ${colorClass} ${isActive ? 'ring-2 ring-white ring-offset-2' : 'opacity-90'}`}
+        className={`flex-1 py-3 px-2 rounded-2xl flex flex-col items-center justify-center gap-1 text-white font-bold text-xs sm:text-sm shadow-md transition-transform transform active:scale-95 ${colorClass} ${isActive ? 'ring-2 ring-white ring-offset-2' : 'opacity-90'}`}
     >
-        {label}
-        {icon && <span className="text-xl">{icon}</span>}
+        {icon && <span className="text-xl mb-1">{icon}</span>}
+        <span className={`text-center w-full ${labelClassName}`}>{label}</span>
     </button>
 );
 
-const ConfirmDeleteButton = ({ label, onConfirm, className }: { label: string, onConfirm: () => void, className?: string }) => {
-    const [confirming, setConfirming] = useState(false);
-
-    if (confirming) {
-        return (
-            <div className="flex gap-2">
-                <Button variant="danger" onClick={onConfirm} className={`text-xs px-2 py-1 ${className}`}>تأكيد ✅</Button>
-                <Button variant="outline" onClick={() => setConfirming(false)} className={`text-xs px-2 py-1 ${className}`}>إلغاء</Button>
-            </div>
-        )
-    }
+// --- CONFIRM MODAL COMPONENT ---
+const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: { isOpen: boolean, title: string, message: string, onConfirm: () => void, onCancel: () => void }) => {
+    if (!isOpen) return null;
     return (
-        <Button variant="danger" onClick={() => setConfirming(true)} className={`text-xs px-2 py-1 ${className}`}>{label}</Button>
-    )
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-sm border-2 border-red-100 text-center animate-slide-up">
+                <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">⚠️</div>
+                <h3 className="text-xl font-bold text-darkBrown mb-2">{title}</h3>
+                <p className="text-sm text-gray-500 mb-6">{message}</p>
+                <div className="flex gap-3">
+                    <Button onClick={onCancel} variant="outline" className="flex-1 py-3">إلغاء</Button>
+                    <Button onClick={onConfirm} variant="danger" className="flex-1 py-3">تأكيد الحذف</Button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 interface DraftState {
@@ -305,16 +307,21 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   onDeleteAdab,
   onQuickAnnouncement
 }) => {
-  const [activeTab, setActiveTab] = useState<'LIST' | 'ADD' | 'DELETE' | 'ANNOUNCEMENTS' | 'ADAB' | 'ATTENDANCE' | 'STATS'>('LIST');
+  // Added 'FEES' to activeTab and removed from student detail (handled in layout)
+  const [activeTab, setActiveTab] = useState<'LIST' | 'ADD' | 'DELETE' | 'ANNOUNCEMENTS' | 'ADAB' | 'ATTENDANCE' | 'STATS' | 'FEES'>('LIST');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [sortMethod, setSortMethod] = useState<'ALPHABETICAL' | 'CODE'>('ALPHABETICAL');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Edit Phone Inline
+  const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null);
+  const [tempPhone, setTempPhone] = useState('');
+
   // Stats
   const [statsDate, setStatsDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Student Detail Tabs
-  const [studentTab, setStudentTab] = useState<'LOG' | 'PLAN' | 'ARCHIVE' | 'CALC' | 'SCHEDULE' | 'FEES'>('LOG');
+  // Student Detail Tabs (FEES removed from here)
+  const [studentTab, setStudentTab] = useState<'LOG' | 'PLAN' | 'ARCHIVE' | 'CALC' | 'SCHEDULE'>('LOG');
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentCode, setNewStudentCode] = useState('');
 
@@ -349,9 +356,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [calcNotes, setCalcNotes] = useState('');
 
   // Fees State
-  const [feeMonth, setFeeMonth] = useState('');
-  const [feeAmount, setFeeAmount] = useState('');
-  const [feeNote, setFeeNote] = useState('');
+  const [activeFeePage, setActiveFeePage] = useState<string>(''); // Holds current Month being VIEWED
+  const [newFeePageMonth, setNewFeePageMonth] = useState<string>(MONTHS_LIST[new Date().getMonth()]);
+  const [newFeePageYear, setNewFeePageYear] = useState<number>(new Date().getFullYear());
+  const initialPage = `${MONTHS_LIST[new Date().getMonth()]} ${new Date().getFullYear()}`;
+  const [feePages, setFeePages] = useState<string[]>([initialPage]); 
+  const [paymentEntries, setPaymentEntries] = useState<Record<string, { amount: string, date: string, notes: string }>>({});
+  const [closedPages, setClosedPages] = useState<string[]>([]); // Track closed pages
+
+  // Confirm Modal State
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Log State
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([{ id: '1', arrival: '16:00', departure: '18:00' }]);
@@ -379,6 +393,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       const d = new Date(examDate);
       setExamDayName(d.toLocaleDateString('ar-EG', { weekday: 'long' }));
   }, [examDate]);
+
+  // Init Fee Pages based on student reminders if activeFeePage is empty
+  useEffect(() => {
+      if (!activeFeePage) {
+          setActiveFeePage(initialPage);
+      }
+  }, []);
 
   const sortedStudents = useMemo(() => {
       let sorted = [...students];
@@ -472,6 +493,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       setSelectedStudentId(null);
       setIsDirty(false); 
       setSaveWarnings([]);
+      setEditingPhoneId(null);
   };
 
   const handleOpenStudent = (s: Student) => {
@@ -486,6 +508,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setSaveWarnings([]);
     setEncouragementMsg('');
     setCalcNotes(s.calculatorNotes || '');
+    setEditingPhoneId(null);
     
     // 1. Check if we have a draft in memory
     if (drafts[s.id]) {
@@ -580,14 +603,32 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       setStudentTab('LOG');
       onShowNotification("تم تحميل السجل للتعديل", "success");
   };
-
+  
   const handleDeleteLog = (logId: string) => {
-      if(!selectedStudent) return;
-      if(window.confirm("هل أنت متأكد من حذف هذا السجل؟")) {
-          const updatedLogs = selectedStudent.logs.filter(l => l.id !== logId);
-          onUpdateStudent({ ...selectedStudent, logs: updatedLogs });
-          onShowNotification("تم حذف السجل", "success");
+      if (!selectedStudent) return;
+      const updatedLogs = selectedStudent.logs.filter(l => l.id !== logId);
+      
+      // If the deleted log was the current one being edited/viewed in LOG tab, reset view
+      if (currentLogId === logId) {
+          setCurrentLogId(null);
+          setJadeed({ ...emptyAssignment });
+          setMurajaahList([{ ...emptyAssignment, grade: Grade.VERY_GOOD }]);
+          setNotes('');
+          setAttendanceRecords([{ id: '1', arrival: '16:00', departure: '18:00' }]);
       }
+      
+      const updatedStudent = { ...selectedStudent, logs: updatedLogs };
+      onUpdateStudent(updatedStudent);
+      onShowNotification("تم حذف السجل", "success");
+  };
+
+  // Generic Open Delete Modal
+  const openDeleteModal = (title: string, message: string, confirmAction: () => void) => {
+      setDeleteModal({ isOpen: true, title, message, onConfirm: confirmAction });
+  };
+
+  const closeDeleteModal = () => {
+      setDeleteModal({ ...deleteModal, isOpen: false });
   };
 
   const markAsDirty = () => {
@@ -751,45 +792,143 @@ ${notes || 'لا توجد ملاحظات'}
       onShowNotification('تم نشر جدول الاختبارات', 'success');
   };
 
-  const handleSendFeeReminder = () => {
-      if(!selectedStudent || !feeMonth) {
-          onShowNotification("يرجى اختيار الشهر", "error");
+  // --- NEW FEES LOGIC IN MAIN DASHBOARD ---
+  const handleCreateNewFeePage = () => {
+      if (!newFeePageMonth) return;
+      const pageTitle = `${newFeePageMonth} ${newFeePageYear}`;
+      
+      if (feePages.includes(pageTitle)) {
+          onShowNotification("هذه الصفحة موجودة بالفعل", "error");
           return;
       }
-      const updatedStudent = {
-          ...selectedStudent,
-          feeReminder: {
-              month: feeMonth,
-              amount: 0, // Not used in display
-              dateSet: new Date().toISOString()
-          }
-      };
-      onUpdateStudent(updatedStudent);
-      onShowNotification("تم إرسال التذكير لولي الأمر", "success");
+
+      const newPages = [...feePages, pageTitle];
+      setFeePages(newPages);
+      setActiveFeePage(pageTitle);
+
+      // Add Debt Logic: If student hasn't paid previous month, append to string
+      students.forEach(s => {
+          let currentDebt = s.feeReminder?.month || '';
+          
+          // Simple logic: Always add the new month to the debt pile
+          const newDebt = currentDebt ? `${currentDebt} + ${pageTitle}` : pageTitle;
+
+          const updatedStudent = {
+              ...s,
+              feeReminder: {
+                  month: newDebt,
+                  dateSet: new Date().toISOString()
+              }
+          };
+          onUpdateStudent(updatedStudent);
+      });
+
+      onShowNotification(`تم فتح صفحة شهر ${pageTitle} وإضافة المديونية للطلاب`, "success");
   };
 
-  const handleAddPayment = () => {
-      if(!selectedStudent || !feeMonth || !feeAmount) {
-          onShowNotification("يرجى تعبئة البيانات", "error");
-          return;
+  const handleBulkFeeReminder = () => {
+      if(!activeFeePage) { onShowNotification("يرجى اختيار الصفحة (الشهر) أولاً", "error"); return; }
+      if(closedPages.includes(activeFeePage)) { onShowNotification("لا يمكن إرسال تذكير لصفحة مغلقة", "error"); return; }
+
+      let count = 0;
+      students.forEach(s => {
+          // Check if student has paid for the current ACTIVE page
+          const hasPaid = s.payments.some(p => p.title.includes(activeFeePage));
+          
+          if (!hasPaid) {
+              // Ensure this month is in the reminder list if not already
+              let currentDebt = s.feeReminder?.month || '';
+              if (!currentDebt.includes(activeFeePage)) {
+                  currentDebt = currentDebt ? `${currentDebt} + ${activeFeePage}` : activeFeePage;
+              }
+              
+              // Just updating timestamp effectively "resends" it if already there
+              const updatedStudent = {
+                  ...s,
+                  feeReminder: {
+                      month: currentDebt,
+                      dateSet: new Date().toISOString()
+                  }
+              };
+              onUpdateStudent(updatedStudent);
+              count++;
+          }
+      });
+      
+      if(count > 0) {
+          onShowNotification(`تم إرسال تذكير لـ ${count} طالب لم يدفعوا ${activeFeePage}`, "success");
+      } else {
+          onShowNotification("الجميع قام بالدفع لهذا الشهر", "success");
       }
+  };
+
+  const handleConfirmPaymentInline = (student: Student) => {
+      const entry = paymentEntries[student.id];
+      if(!entry || !entry.amount) { onShowNotification("أدخل المبلغ", "error"); return; }
+      
+      const paymentDate = entry.date || new Date().toISOString();
+      const monthTitle = activeFeePage; // Strictly pay for current PAGE context
+
       const newPayment: Payment = {
-          id: 'pay_' + Date.now(),
-          title: `رسوم شهر ${feeMonth}`,
-          amount: parseFloat(feeAmount),
-          date: new Date().toISOString(),
+          id: 'pay_' + Date.now() + Math.random(),
+          title: `رسوم: ${monthTitle}`, // Record strictly for this month/page
+          amount: parseFloat(entry.amount),
+          date: paymentDate,
           recordedBy: teacherName,
-          notes: feeNote
+          notes: entry.notes
       };
       
+      // Update Reminder: Remove THIS month from the debt string if present
+      let currentDebt = student.feeReminder?.month || '';
+      let newDebt = currentDebt.split(' + ').filter(m => m !== activeFeePage).join(' + ');
+      
       const updatedStudent = {
-          ...selectedStudent,
-          payments: [newPayment, ...selectedStudent.payments],
-          feeReminder: undefined // Remove reminder on payment
+          ...student,
+          payments: [newPayment, ...student.payments],
+          feeReminder: newDebt ? { ...student.feeReminder!, month: newDebt } : undefined
       };
+      
       onUpdateStudent(updatedStudent);
-      setFeeAmount(''); setFeeNote('');
-      onShowNotification("تم تسجيل الدفعة وإلغاء التذكير", "success");
+      
+      // Clear entry but KEEP amount visually if needed? No, standard is to clear input. 
+      // But user asked: "Calculator numbers remain constant even after confirmation"
+      // Calculator reads from `student.payments`, so it WILL increase.
+      const newEntries = { ...paymentEntries };
+      delete newEntries[student.id];
+      setPaymentEntries(newEntries);
+      onShowNotification(`تم تأكيد دفع ${student.name}`, "success");
+  };
+
+  const updatePaymentEntry = (studentId: string, field: 'amount' | 'date' | 'notes', value: string) => {
+      setPaymentEntries(prev => ({
+          ...prev,
+          [studentId]: {
+              amount: field === 'amount' ? value : (prev[studentId]?.amount || ''),
+              date: field === 'date' ? value : (prev[studentId]?.date || new Date().toISOString().split('T')[0]),
+              notes: field === 'notes' ? value : (prev[studentId]?.notes || ''),
+          }
+      }));
+  };
+
+  const calculateTotalCollectedForPage = () => {
+      // Calculate strictly based on CONFIRMED payments for this active page (Month Name)
+      const confirmedTotal = students.reduce((sum, s) => {
+          const relevantPayments = s.payments.filter(p => p.title.includes(activeFeePage)); // Match Payment Title
+          const subTotal = relevantPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+          return sum + subTotal;
+      }, 0);
+
+      return confirmedTotal;
+  };
+
+  const toggleClosePage = (pageTitle: string) => {
+      setClosedPages(prev => {
+          if (prev.includes(pageTitle)) {
+              return prev.filter(p => p !== pageTitle);
+          } else {
+              return [...prev, pageTitle];
+          }
+      });
   };
 
   const saveCalculatorNotes = () => {
@@ -858,11 +997,34 @@ ${notes || 'لا توجد ملاحظات'}
       return `(${from} - ${to})`;
   };
 
+  // Inline edit handler
+  const handleStartPhoneEdit = (id: string, current: string) => {
+      setEditingPhoneId(id);
+      setTempPhone(current || '');
+  };
+
+  const handleSavePhone = (studentId: string) => {
+      if(!selectedStudent) return; // Should be the same
+      if(tempPhone) {
+          onUpdateStudent({...selectedStudent, parentPhone: tempPhone});
+          onShowNotification("تم تحديث الرقم", "success");
+      }
+      setEditingPhoneId(null);
+  };
+
   return (
     <div className="min-h-screen bg-texture pb-20 relative font-sans">
        
        {/* Background Decoration */}
        <div className="fixed top-0 left-0 w-full h-32 bg-gradient-to-b from-paper to-transparent pointer-events-none z-0"></div>
+
+       <ConfirmModal 
+           isOpen={deleteModal.isOpen} 
+           title={deleteModal.title} 
+           message={deleteModal.message} 
+           onConfirm={() => { deleteModal.onConfirm(); closeDeleteModal(); }} 
+           onCancel={closeDeleteModal} 
+       />
 
        {/* HEADER & MAIN NAV */}
        <div className="sticky top-0 z-30 bg-texture/95 backdrop-blur-md pt-6 pb-4 px-4 shadow-sm border-b border-darkBrown/5">
@@ -886,6 +1048,7 @@ ${notes || 'لا توجد ملاحظات'}
                         id="LIST" 
                         label="الطلاب" 
                         icon="👥"
+                        labelClassName="font-bold" // Removed text-lg
                         isActive={activeTab === 'LIST'} 
                         onClick={() => setActiveTab('LIST')} 
                         colorClass="bg-[#8f964d]" 
@@ -893,6 +1056,7 @@ ${notes || 'لا توجد ملاحظات'}
                     <ActionButton 
                         id="ADD" 
                         label="إضافة +" 
+                        labelClassName="font-bold" // Removed text-lg
                         isActive={activeTab === 'ADD'} 
                         onClick={() => setActiveTab('ADD')} 
                         colorClass="bg-[#8f964d]" 
@@ -911,6 +1075,24 @@ ${notes || 'لا توجد ملاحظات'}
 
        <div className="p-4 max-w-lg mx-auto relative z-10 min-h-[60vh]">
             
+            {/* GLOBAL WARNING MODAL - SMALLER */}
+            {saveWarnings.length > 0 && (
+                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full border-2 border-red-100 text-center animate-slide-up">
+                        <div className="text-4xl mb-3">⚠️</div>
+                        <h4 className="font-bold text-red-700 text-lg mb-2">تنبيه هام</h4>
+                        <p className="text-xs text-gray-500 mb-4">يرجى مراجعة النقاط التالية قبل الحفظ:</p>
+                        <ul className="text-sm text-gray-800 mb-6 space-y-2 list-disc list-inside text-right w-full font-bold bg-red-50 p-3 rounded-xl border border-red-100">
+                            {saveWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                        </ul>
+                        <div className="flex gap-3 w-full">
+                            <Button onClick={() => setSaveWarnings([])} variant="outline" className="flex-1 text-sm py-2">تراجع وتعديل</Button>
+                            <Button onClick={executeSaveLog} variant="danger" className="flex-1 text-sm py-2">حفظ وتجاهل</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {!selectedStudentId ? (
                 <>
                     {/* STUDENTS LIST */}
@@ -1037,9 +1219,254 @@ ${notes || 'لا توجد ملاحظات'}
                     )}
 
                     {/* NEW: SECONDARY TABS AT BOTTOM AS GRID */}
-                    {['ANNOUNCEMENTS', 'ADAB', 'STATS', 'DELETE'].includes(activeTab) && (
+                    {['ANNOUNCEMENTS', 'ADAB', 'STATS', 'DELETE', 'FEES'].includes(activeTab) && (
                         <div className="bg-paper p-4 rounded-3xl shadow-lg border border-white animate-slide-up min-h-[300px] mb-8">
                             
+                            {/* FEES TAB - TEACHER SIDE */}
+                            {activeTab === 'FEES' && (
+                                <div className="animate-fade-in">
+                                    <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                        <h3 className="font-bold text-darkBrown">💰 إدارة الرسوم</h3>
+                                        {/* Persistent Calculator - Always shows confirmed amount for this page */}
+                                        <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                                            إجمالي التحصيل: {calculateTotalCollectedForPage()} ج.م
+                                        </div>
+                                    </div>
+                                    
+                                    {/* PAGE CONTROLS - ARCHIVE LIST */}
+                                    <div className="bg-white p-3 rounded-2xl border border-gray-200 mb-4 shadow-sm relative">
+                                        {/* Close Page Button */}
+                                        {activeFeePage && (
+                                            <button 
+                                                onClick={() => toggleClosePage(activeFeePage)}
+                                                className={`absolute top-3 left-3 px-2 py-1 rounded text-[10px] font-bold border transition ${
+                                                    closedPages.includes(activeFeePage) 
+                                                        ? 'bg-red-100 text-red-600 border-red-200' 
+                                                        : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {closedPages.includes(activeFeePage) ? '🔒 مغلقة (اضغط للفتح)' : '🔓 مفتوحة (إغلاق الصفحة)'}
+                                            </button>
+                                        )}
+
+                                        {/* Archive List as Chips */}
+                                        <label className="text-xs font-bold text-gray-500 mb-2 block">أرشيف السجلات السابقة:</label>
+                                        <div className="flex gap-2 overflow-x-auto pb-2 mb-3 no-scrollbar snap-x">
+                                            {feePages.map(p => (
+                                                <button 
+                                                    key={p} 
+                                                    onClick={() => setActiveFeePage(p)}
+                                                    className={`snap-start whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold transition-all border ${
+                                                        activeFeePage === p 
+                                                            ? 'bg-darkBrown text-white border-darkBrown shadow-md' 
+                                                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    {p} {closedPages.includes(p) && '🔒'}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex gap-2 items-end border-t pt-2">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] text-gray-400 font-bold block mb-1">فتح سجل جديد:</label>
+                                                <div className="flex gap-1">
+                                                    <select 
+                                                        className="w-2/3 p-2 border rounded-xl text-xs font-bold bg-white"
+                                                        value={newFeePageMonth}
+                                                        onChange={(e) => setNewFeePageMonth(e.target.value)}
+                                                    >
+                                                        {MONTHS_LIST.map(m => <option key={m} value={m}>{m}</option>)}
+                                                    </select>
+                                                    <select 
+                                                        className="w-1/3 p-2 border rounded-xl text-xs font-bold bg-white"
+                                                        value={newFeePageYear}
+                                                        onChange={(e) => setNewFeePageYear(parseInt(e.target.value))}
+                                                    >
+                                                        {Array.from({length: 5}, (_, i) => new Date().getFullYear() - 1 + i).map(y => (
+                                                            <option key={y} value={y}>{y}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <Button onClick={handleCreateNewFeePage} className="py-2 text-[10px] h-[38px] bg-secondary hover:bg-secondaryDark">
+                                                + فتح
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Bar for Active Page */}
+                                    <div className="mb-4">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <h4 className="text-sm font-bold text-darkBrown">سجل شهر: <span className="text-secondaryDark">{activeFeePage}</span></h4>
+                                            {!closedPages.includes(activeFeePage) && (
+                                                <button 
+                                                    onClick={handleBulkFeeReminder}
+                                                    className="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:bg-red-100 transition flex items-center gap-1"
+                                                >
+                                                    🔔 إرسال تذكير للمتأخرين
+                                                </button>
+                                            )}
+                                        </div>
+                                        {closedPages.includes(activeFeePage) && (
+                                            <p className="text-xs text-red-500 bg-red-50 p-2 rounded border border-red-100 text-center font-bold">⚠️ هذا السجل مغلق، لا يمكن التعديل عليه.</p>
+                                        )}
+                                    </div>
+
+                                    {/* Student List for Payment Confirmation */}
+                                    <div className="space-y-3">
+                                        {sortedStudents.map(s => {
+                                            // Check if student has paid for the current ACTIVE page
+                                            const hasPaidThisPage = s.payments.some(p => p.title.includes(activeFeePage));
+                                            const debtString = s.feeReminder?.month || '';
+                                            const isPageClosed = closedPages.includes(activeFeePage);
+                                            
+                                            // Initialize entry if not exists
+                                            const entry = paymentEntries[s.id] || { 
+                                                amount: '', 
+                                                date: new Date().toISOString().split('T')[0], 
+                                                notes: ''
+                                            };
+                                            
+                                            return (
+                                                <div key={s.id} className={`bg-white p-3 rounded-xl border shadow-sm relative ${hasPaidThisPage ? 'border-green-300 bg-green-50' : 'border-gray-200'} ${isPageClosed ? 'opacity-70' : ''}`}>
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="font-bold text-sm text-darkBrown">{s.name}</span>
+                                                        {debtString && !hasPaidThisPage && (
+                                                            <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">
+                                                                مطلوب: {debtString}
+                                                            </span>
+                                                        )}
+                                                        {hasPaidThisPage && <span className="text-green-600 font-bold text-xs">✅ تم الدفع</span>}
+                                                    </div>
+                                                    
+                                                    {!hasPaidThisPage && (
+                                                        <>
+                                                            <div className="flex gap-2 items-center mb-1">
+                                                                <input 
+                                                                    type="number" 
+                                                                    placeholder="المبلغ" 
+                                                                    className="w-20 p-2 border rounded-lg text-xs text-center font-bold bg-gray-50 focus:bg-white transition"
+                                                                    value={entry.amount}
+                                                                    onChange={(e) => updatePaymentEntry(s.id, 'amount', e.target.value)}
+                                                                    disabled={isPageClosed}
+                                                                />
+                                                                <input 
+                                                                    type="text" 
+                                                                    placeholder="ملاحظات" 
+                                                                    className="flex-1 p-2 border rounded-lg text-xs"
+                                                                    value={entry.notes}
+                                                                    onChange={(e) => updatePaymentEntry(s.id, 'notes', e.target.value)}
+                                                                    disabled={isPageClosed}
+                                                                />
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <input 
+                                                                    type="date"
+                                                                    className="w-1/3 p-1 border rounded text-[10px] bg-gray-50"
+                                                                    value={entry.date}
+                                                                    onChange={(e) => updatePaymentEntry(s.id, 'date', e.target.value)}
+                                                                    disabled={isPageClosed}
+                                                                />
+                                                                <button 
+                                                                    onClick={() => handleConfirmPaymentInline(s)}
+                                                                    className={`flex-1 text-white p-1 rounded-lg text-xs font-bold shadow-md ${isPageClosed ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                                                                    disabled={isPageClosed}
+                                                                >
+                                                                    {isPageClosed ? 'مغلق' : 'تأكيد واستلام 💰'}
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    
+                                                    {/* Last Payment Info specific to this page if paid */}
+                                                    {hasPaidThisPage && (
+                                                        <p className="text-[10px] text-gray-500 mt-1 font-bold">
+                                                            {s.payments.find(p => p.title.includes(activeFeePage))?.amount} ج.م - بتاريخ {formatSimpleDate(s.payments.find(p => p.title.includes(activeFeePage))?.date || '')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ADAB TAB FIXED */}
+                            {activeTab === 'ADAB' && (
+                                <div>
+                                    <h3 className="font-bold text-center mb-4 text-darkBrown">🌟 مجلس الآداب والتربية</h3>
+                                    
+                                    <div className="bg-white p-3 rounded-2xl border border-gray-200 mb-4 shadow-sm">
+                                        <label className="text-xs font-bold text-gray-500 block mb-1">عنوان الدرس</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full p-2 border rounded-xl mb-3 text-sm font-bold" 
+                                            placeholder="مثال: آداب الاستئذان" 
+                                            value={adabTitle} 
+                                            onChange={e => setAdabTitle(e.target.value)} 
+                                        />
+                                        
+                                        <div className="bg-gray-50 p-2 rounded-xl border border-gray-100">
+                                            <p className="text-xs font-bold text-secondaryDark mb-2">إضافة سؤال للاختبار:</p>
+                                            <input type="text" className="w-full p-2 border rounded-lg mb-2 text-xs" placeholder="السؤال" value={currentQuestion} onChange={e => setCurrentQuestion(e.target.value)} />
+                                            <input type="text" className="w-full p-2 border rounded-lg mb-2 text-xs border-green-200 bg-green-50" placeholder="الإجابة الصحيحة" value={currentCorrect} onChange={e => setCurrentCorrect(e.target.value)} />
+                                            <div className="flex gap-2">
+                                                <input type="text" className="flex-1 p-2 border rounded-lg mb-2 text-xs border-red-200 bg-red-50" placeholder="إجابة خاطئة 1" value={currentWrong1} onChange={e => setCurrentWrong1(e.target.value)} />
+                                                <input type="text" className="flex-1 p-2 border rounded-lg mb-2 text-xs border-red-200 bg-red-50" placeholder="إجابة خاطئة 2" value={currentWrong2} onChange={e => setCurrentWrong2(e.target.value)} />
+                                            </div>
+                                            <Button onClick={handleAddToQuestionList} className="w-full text-xs py-2 bg-secondary hover:bg-secondaryDark">إضافة السؤال للقائمة +</Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Questions List */}
+                                    {adabQuestionsList.length > 0 && (
+                                        <div className="mb-4">
+                                            <h4 className="text-xs font-bold text-gray-500 mb-2">الأسئلة المضافة ({adabQuestionsList.length}):</h4>
+                                            <div className="space-y-2">
+                                                {adabQuestionsList.map((q, i) => (
+                                                    <div key={q.id} className="bg-white p-2 rounded-xl border border-gray-200 text-xs flex justify-between items-center">
+                                                        <span className="font-bold truncate max-w-[70%]">{i+1}. {q.question}</span>
+                                                        <div className="flex gap-1">
+                                                            <button onClick={() => handleEditQuestionFromList(q)} className="text-blue-500 px-1">✏️</button>
+                                                            <button onClick={() => setAdabQuestionsList(adabQuestionsList.filter(x => x.id !== q.id))} className="text-red-500 px-1">🗑️</button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <Button onClick={handlePublishAdabLesson} className="w-full py-3 rounded-xl shadow-md font-bold text-lg mb-4">
+                                        {editingAdabId ? 'حفظ التعديلات' : 'نشر الدرس للطلاب 📢'}
+                                    </Button>
+
+                                    {/* Archive */}
+                                    <div className="border-t pt-4">
+                                        <h4 className="text-xs font-bold text-gray-400 mb-2">دروس سابقة:</h4>
+                                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {adabArchive.map(s => (
+                                                <div key={s.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border">
+                                                    <div>
+                                                        <span className="block font-bold text-xs">{s.title}</span>
+                                                        <span className="text-[10px] text-gray-400">{formatSimpleDate(s.date)}</span>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => handleEditAdabSession(s)} className="text-blue-500 text-xs font-bold">تعديل</button>
+                                                        <button 
+                                                            onClick={() => openDeleteModal('حذف الدرس', 'هل أنت متأكد من حذف هذا الدرس وسجلاته؟', () => onDeleteAdab(s.id))}
+                                                            className="text-red-500 text-xs font-bold px-1"
+                                                        >
+                                                            حذف
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* ANNOUNCEMENTS TAB */}
                             {activeTab === 'ANNOUNCEMENTS' && (
                                 <div>
@@ -1174,7 +1601,12 @@ ${notes || 'لا توجد ملاحظات'}
                                                             announcements.filter(a => a.type === 'EXAM').map(a => (
                                                                 <div key={a.id} className="text-xs bg-white p-2 rounded border flex justify-between items-center">
                                                                     <span>{formatSimpleDate(a.date)}</span>
-                                                                    <ConfirmDeleteButton label="حذف" onConfirm={() => onDeleteAnnouncement(a.id)} className="bg-red-50 text-red-500 border border-red-100" />
+                                                                    <button 
+                                                                        onClick={() => openDeleteModal('حذف الاختبار', 'هل أنت متأكد من حذف هذا الاختبار؟', () => onDeleteAnnouncement(a.id))}
+                                                                        className="bg-red-50 text-red-500 border border-red-100 px-2 py-1 rounded text-xs font-bold"
+                                                                    >
+                                                                        حذف
+                                                                    </button>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -1253,7 +1685,13 @@ ${notes || 'لا توجد ملاحظات'}
                                         {sortedStudents.map(s => (
                                             <div key={s.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
                                                 <span className="font-bold text-sm">{s.name}</span>
-                                                <ConfirmDeleteButton label="حذف" onConfirm={() => onDeleteStudents([s.id])} className="bg-white shadow-sm border" />
+                                                <Button 
+                                                    onClick={() => openDeleteModal('حذف الطالب', 'هل أنت متأكد من حذف الطالب نهائياً؟', () => onDeleteStudents([s.id]))} 
+                                                    variant="danger" 
+                                                    className="text-xs px-3 py-1"
+                                                >
+                                                    حذف
+                                                </Button>
                                             </div>
                                         ))}
                                     </div>
@@ -1262,9 +1700,9 @@ ${notes || 'لا توجد ملاحظات'}
                         </div>
                     )}
                     
-                    {/* NEW: Bottom Navigation Grid */}
+                    {/* NEW: Bottom Navigation Grid - Updated with FEES */}
                     {!selectedStudentId && (
-                        <div className="grid grid-cols-4 gap-2 mb-8">
+                        <div className="grid grid-cols-5 gap-1 mb-8">
                             <ActionButton 
                                 id="ANNOUNCEMENTS" 
                                 label="إعلانات" 
@@ -1279,6 +1717,14 @@ ${notes || 'لا توجد ملاحظات'}
                                 icon="🌟" 
                                 isActive={activeTab === 'ADAB'} 
                                 onClick={() => setActiveTab('ADAB')} 
+                                colorClass="bg-[#8f964d]"
+                            />
+                            <ActionButton 
+                                id="FEES" 
+                                label="الرسوم" 
+                                icon="💰" 
+                                isActive={activeTab === 'FEES'} 
+                                onClick={() => setActiveTab('FEES')} 
                                 colorClass="bg-[#8f964d]"
                             />
                             <ActionButton 
@@ -1305,7 +1751,6 @@ ${notes || 'لا توجد ملاحظات'}
                 <div className="animate-slide-up">
                     <div className="flex items-center justify-between mb-4">
                         <button onClick={handleCloseStudent} className="bg-paper p-2 rounded-full shadow-sm text-darkBrown font-bold">⬅ رجوع</button>
-                        {/* Edit Mode Indicator */}
                         {currentLogId && (
                             <div className="bg-amber-100 text-amber-800 text-xs px-3 py-1 rounded-full font-bold border border-amber-200 animate-pulse">
                                 ✏️ وضع تعديل سجل سابق
@@ -1313,50 +1758,47 @@ ${notes || 'لا توجد ملاحظات'}
                         )}
                     </div>
                     
-                    {/* PHONE NUMBER & WHATSAPP DISPLAY (MOVED HERE) */}
+                    {/* PHONE NUMBER & WHATSAPP DISPLAY */}
                     <div className="flex flex-col items-center justify-center mb-6">
                         <h2 className="font-bold text-3xl text-darkBrown font-serif mb-1">{selectedStudent?.name}</h2>
                         <div className="flex items-center gap-2">
-                            <span className="text-lg font-mono font-bold text-darkBrown tracking-widest">{selectedStudent?.parentPhone}</span>
-                            <div className="flex gap-1">
-                                <button onClick={() => {
-                                    const newP = prompt("تعديل رقم الهاتف:", selectedStudent?.parentPhone);
-                                    if (newP) onUpdateStudent({...selectedStudent!, parentPhone: newP});
-                                }} className="text-secondary hover:text-secondaryDark text-lg">✏️</button>
-                                <button onClick={() => {
-                                    if(selectedStudent?.parentPhone) window.open(`https://wa.me/2${selectedStudent.parentPhone}`, '_blank');
-                                }} className="text-green-600 hover:text-green-700 text-lg bg-white rounded-full p-1 shadow-sm">💬</button>
-                            </div>
+                            {editingPhoneId === selectedStudent?.id ? (
+                                <div className="flex items-center gap-1">
+                                    <input 
+                                        type="text" 
+                                        className="w-32 p-1 border rounded text-lg font-mono text-center" 
+                                        value={tempPhone}
+                                        onChange={(e) => setTempPhone(e.target.value)}
+                                        autoFocus
+                                    />
+                                    <button onClick={() => handleSavePhone(selectedStudent.id)} className="bg-green-500 text-white w-8 h-8 rounded-full flex items-center justify-center">✓</button>
+                                </div>
+                            ) : (
+                                <span className="text-lg font-mono font-bold text-darkBrown tracking-widest">{selectedStudent?.parentPhone}</span>
+                            )}
+                            
+                            {!editingPhoneId && (
+                                <div className="flex gap-1">
+                                    <button onClick={() => handleStartPhoneEdit(selectedStudent?.id || '', selectedStudent?.parentPhone || '')} className="text-secondary hover:text-secondaryDark text-lg">✏️</button>
+                                    <button onClick={() => {
+                                        if(selectedStudent?.parentPhone) window.open(`https://wa.me/2${selectedStudent.parentPhone}`, '_blank');
+                                    }} className="text-green-600 hover:text-green-700 text-lg bg-white rounded-full p-1 shadow-sm">💬</button>
+                                </div>
+                            )}
                         </div>
                     </div>
                     
-                    {/* Student Tabs */}
+                    {/* Student Tabs - FEES REMOVED */}
                     <div className="flex overflow-x-auto gap-2 pb-2 mb-2 touch-pan-x bg-paper p-2 rounded-2xl shadow-sm border border-white no-scrollbar">
                         <button onClick={() => setStudentTab('LOG')} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-200 border text-sm font-bold ${studentTab === 'LOG' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-500'}`}>📝 تسجيل</button>
                         <button onClick={() => setStudentTab('PLAN')} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-200 border text-sm font-bold ${studentTab === 'PLAN' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-500'}`}>📅 اللوح</button>
                         <button onClick={() => setStudentTab('ARCHIVE')} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-200 border text-sm font-bold ${studentTab === 'ARCHIVE' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-500'}`}>🗄️ الأرشيف</button>
                         <button onClick={() => setStudentTab('CALC')} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-200 border text-sm font-bold ${studentTab === 'CALC' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-500'}`}>🔢 الحاسبة</button>
                         <button onClick={() => setStudentTab('SCHEDULE')} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-200 border text-sm font-bold ${studentTab === 'SCHEDULE' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-500'}`}>🕒 المواعيد</button>
-                        <button onClick={() => setStudentTab('FEES')} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-200 border text-sm font-bold ${studentTab === 'FEES' ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-500'}`}>💰 الرسوم</button>
                     </div>
 
                     <div className="bg-paper rounded-3xl shadow-lg p-3 border border-white relative min-h-[300px]">
                         
-                        {/* IN-APP WARNING MODAL - SMALLER */}
-                        {saveWarnings.length > 0 && (
-                            <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-4 rounded-3xl animate-fade-in text-center max-w-sm mx-auto">
-                                <div className="text-3xl mb-2">⚠️</div>
-                                <h4 className="font-bold text-red-600 text-sm mb-2">تنبيه هام</h4>
-                                <ul className="text-xs text-gray-700 mb-4 space-y-1 list-disc list-inside text-right w-full font-bold">
-                                    {saveWarnings.map((w, i) => <li key={i}>{w}</li>)}
-                                </ul>
-                                <div className="flex gap-2 w-full">
-                                    <Button onClick={() => setSaveWarnings([])} variant="outline" className="flex-1 text-xs py-2">تراجع</Button>
-                                    <Button onClick={executeSaveLog} variant="danger" className="flex-1 text-xs py-2">حفظ وتجاهل</Button>
-                                </div>
-                            </div>
-                        )}
-
                         {studentTab === 'LOG' && (
                             <div className="space-y-3">
                                 {/* ATTENDANCE SECTION */}
@@ -1457,7 +1899,12 @@ ${notes || 'لا توجد ملاحظات'}
                                                      {log.isAbsent ? 'غائب' : 'حضور'}
                                                  </span>
                                                  <button onClick={() => handleEditLog(log)} className="text-blue-600 px-1 font-bold">تعديل ✏️</button>
-                                                 <button onClick={() => handleDeleteLog(log.id)} className="text-red-600 px-1 font-bold">حذف 🗑️</button>
+                                                 <button 
+                                                     onClick={() => openDeleteModal('حذف السجل', 'هل أنت متأكد من حذف هذا السجل اليومي؟', () => handleDeleteLog(log.id))}
+                                                     className="text-red-600 px-1 font-bold"
+                                                 >
+                                                     حذف 🗑️
+                                                 </button>
                                              </div>
                                          </div>
                                          
@@ -1578,43 +2025,6 @@ ${notes || 'لا توجد ملاحظات'}
                                         </div>
                                     </div>
                                 ))}
-                            </div>
-                        )}
-
-                        {/* FEES TAB */}
-                        {studentTab === 'FEES' && (
-                            <div className="space-y-4">
-                                <div className="bg-white p-4 rounded-xl border border-gray-200">
-                                    <h4 className="font-bold text-sm mb-3">تسجيل دفعة جديدة / تذكير</h4>
-                                    <div className="grid grid-cols-2 gap-2 mb-2">
-                                        <select className="p-2 border rounded text-sm" value={feeMonth} onChange={e => setFeeMonth(e.target.value)}>
-                                            <option value="">اختر الشهر</option>
-                                            {MONTHS_LIST.map(m => <option key={m} value={m}>{m}</option>)}
-                                        </select>
-                                        <input type="number" className="p-2 border rounded text-sm" placeholder="المبلغ (للدفع)" value={feeAmount} onChange={e => setFeeAmount(e.target.value)} />
-                                    </div>
-                                    <input type="text" className="w-full p-2 border rounded text-sm mb-3" placeholder="ملاحظات (للدفع)" value={feeNote} onChange={e => setFeeNote(e.target.value)} />
-                                    
-                                    <div className="flex gap-2">
-                                        <Button onClick={handleSendFeeReminder} variant="outline" className="flex-1 text-xs">إرسال تذكير 🔔</Button>
-                                        <Button onClick={handleAddPayment} className="flex-1 text-xs">تسجيل الدفعة 💰</Button>
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-1 text-center">التذكير يرسل الشهر فقط. الدفع يتطلب المبلغ.</p>
-                                </div>
-
-                                <div>
-                                    <h4 className="font-bold text-xs text-gray-500 mb-2">سجل المدفوعات:</h4>
-                                    {selectedStudent?.payments.length === 0 ? <p className="text-center text-gray-400 text-sm">لا يوجد مدفوعات</p> : 
-                                    selectedStudent?.payments.map(p => (
-                                        <div key={p.id} className="bg-green-50 p-3 rounded-xl border border-green-100 mb-2 text-sm flex justify-between items-center">
-                                            <div>
-                                                <span className="font-bold text-green-800">{p.title}</span>
-                                                <span className="text-xs text-green-600 block">{formatSimpleDate(p.date)}</span>
-                                            </div>
-                                            <span className="font-bold text-lg">{p.amount} ج.م</span>
-                                        </div>
-                                    ))}
-                                </div>
                             </div>
                         )}
                     </div>
