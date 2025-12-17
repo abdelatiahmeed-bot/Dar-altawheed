@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import './firebaseConfig'; // 👈 تم إضافة هذا السطر لربط التطبيق بفاير بيز
+// 👇 تحديث: استدعاء db لاستخدامه في العمليات
+import { db } from './firebaseConfig'; 
+// 👇 تحديث: استدعاء دوال التعامل مع قاعدة البيانات
+import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 
 import { Student, AppState, UserRole, Teacher, DailyLog, Announcement, QuizItem, AdabSession, OrgSettings } from './types';
 import { INITIAL_STUDENTS, INITIAL_TEACHERS, DAYS_OF_WEEK, APP_VERSION } from './constants';
@@ -129,12 +132,51 @@ const App: React.FC = () => {
       }
   });
 
-  // PERSISTENCE EFFECTS
+  // PERSISTENCE EFFECTS (LOCAL STORAGE)
   useEffect(() => { localStorage.setItem('muhaffiz_students_v3', JSON.stringify(students)); }, [students]);
   useEffect(() => { localStorage.setItem('muhaffiz_teachers_v3', JSON.stringify(teachers)); }, [teachers]);
   useEffect(() => { localStorage.setItem('muhaffiz_announcements_v3', JSON.stringify(announcements)); }, [announcements]);
   useEffect(() => { localStorage.setItem('muhaffiz_adab_archive_v3', JSON.stringify(adabArchive)); }, [adabArchive]);
   useEffect(() => { localStorage.setItem('muhaffiz_settings_v3', JSON.stringify(orgSettings)); }, [orgSettings]);
+
+  // 🔥 ADDED: FIREBASE SYNC ON LOAD (استرجاع البيانات من السحابة عند الفتح)
+  useEffect(() => {
+    const fetchFromFirebase = async () => {
+        try {
+            // جلب الطلاب
+            const studentsSnap = await getDocs(collection(db, 'students'));
+            if (!studentsSnap.empty) {
+                const firebaseStudents = studentsSnap.docs.map(doc => doc.data() as Student);
+                setStudents(firebaseStudents);
+            }
+            // جلب المعلمين
+            const teachersSnap = await getDocs(collection(db, 'teachers'));
+            if (!teachersSnap.empty) {
+                const firebaseTeachers = teachersSnap.docs.map(doc => doc.data() as Teacher);
+                setTeachers(firebaseTeachers);
+            }
+            // جلب الإعلانات
+            const annSnap = await getDocs(collection(db, 'announcements'));
+            if (!annSnap.empty) {
+                setAnnouncements(annSnap.docs.map(doc => doc.data() as Announcement));
+            }
+            // جلب الأرشيف
+            const adabSnap = await getDocs(collection(db, 'adabArchive'));
+            if (!adabSnap.empty) {
+                setAdabArchive(adabSnap.docs.map(doc => doc.data() as AdabSession));
+            }
+            // جلب الإعدادات
+            const settingsSnap = await getDocs(collection(db, 'settings'));
+            if (!settingsSnap.empty) {
+                const settingsData = settingsSnap.docs.find(d => d.id === 'orgSettings')?.data() as OrgSettings;
+                if (settingsData) setOrgSettings(settingsData);
+            }
+        } catch (error) {
+            console.error("Error fetching data from Firebase:", error);
+        }
+    };
+    fetchFromFirebase();
+  }, []); // Run once on mount
 
   useEffect(() => {
       document.title = `${orgSettings.name} - متابعة القرآن الكريم`;
@@ -281,13 +323,19 @@ const App: React.FC = () => {
       setShowPhoneSetup(false); 
   };
 
-  // --- DATA OPERATIONS (LOCAL STORAGE) ---
+  // --- DATA OPERATIONS ---
   const updateStudent = (updatedStudent: Student) => { 
       setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+      // 🔥 ADDED: Firebase Update
+      setDoc(doc(db, 'students', updatedStudent.id), updatedStudent).catch(e => console.error("FB Error:", e));
   };
   
   const deleteStudents = (studentIds: string[]) => { 
       setStudents(prev => prev.filter(s => !studentIds.includes(s.id)));
+      // 🔥 ADDED: Firebase Delete
+      studentIds.forEach(id => {
+          deleteDoc(doc(db, 'students', id)).catch(e => console.error("FB Delete Error:", e));
+      });
       showNotification('تم حذف الطالب بنجاح'); 
   };
   
@@ -295,25 +343,32 @@ const App: React.FC = () => {
     const teacherId = appState.currentUser.id || 'unknown'; 
     const teacherName = appState.currentUser.name || 'المعلم'; 
     
-    setStudents(prev => prev.map(student => {
-        if (absentIds.includes(student.id) || excusedIds.includes(student.id)) {
-            let note = "";
-            if (absentIds.includes(student.id)) note = "غياب غير مبرر";
-            else note = "غائب بعذر - جزاكم الله خيراً على تبليغ الشيخ";
-            
-            const log: DailyLog = { 
-                id: 'absent_' + Date.now() + Math.random(), 
-                date: new Date().toISOString(), 
-                teacherId, 
-                teacherName, 
-                seenByParent: false, 
-                isAbsent: true, 
-                notes: note 
-            };
-            return { ...student, logs: [log, ...student.logs] };
-        }
-        return student;
-    }));
+    // We need to calculate new state to save it to Firebase
+    setStudents(prev => {
+        const nextState = prev.map(student => {
+            if (absentIds.includes(student.id) || excusedIds.includes(student.id)) {
+                let note = "";
+                if (absentIds.includes(student.id)) note = "غياب غير مبرر";
+                else note = "غائب بعذر - جزاكم الله خيراً على تبليغ الشيخ";
+                
+                const log: DailyLog = { 
+                    id: 'absent_' + Date.now() + Math.random(), 
+                    date: new Date().toISOString(), 
+                    teacherId, 
+                    teacherName, 
+                    seenByParent: false, 
+                    isAbsent: true, 
+                    notes: note 
+                };
+                const updated = { ...student, logs: [log, ...student.logs] };
+                // 🔥 ADDED: Save Modified Student to Firebase
+                setDoc(doc(db, 'students', updated.id), updated).catch(console.error);
+                return updated;
+            }
+            return student;
+        });
+        return nextState;
+    });
     showNotification(`تم تسجيل الغياب لـ ${absentIds.length + excusedIds.length} طالب`, 'success'); 
   };
   
@@ -328,47 +383,69 @@ const App: React.FC = () => {
           logs: [] 
       }; 
       setStudents(prev => [newStudent, ...prev]);
+      // 🔥 ADDED: Firebase Save
+      setDoc(doc(db, 'students', newStudent.id), newStudent).catch(e => console.error(e));
       return newStudent; 
   };
   
   const addTeacher = (name: string, loginCode: string, phone: string) => { 
       const newTeacher: Teacher = { id: 't_' + Date.now(), name, loginCode, phone }; 
       setTeachers(prev => [...prev, newTeacher]);
+      // 🔥 ADDED: Firebase Save
+      setDoc(doc(db, 'teachers', newTeacher.id), newTeacher).catch(e => console.error(e));
       showNotification('تم إضافة المحفظ بنجاح'); 
   };
   
   const updateTeacher = (id: string, name: string, loginCode: string, phone: string) => { 
-      setTeachers(prev => prev.map(t => t.id === id ? { ...t, name, loginCode, phone } : t));
+      // Calculate object to update
+      const updatedData = { id, name, loginCode, phone };
+      setTeachers(prev => prev.map(t => t.id === id ? { ...t, ...updatedData } : t));
+      // 🔥 ADDED: Firebase Update
+      updateDoc(doc(db, 'teachers', id), updatedData).catch(e => console.error(e));
       showNotification('تم تعديل بيانات المحفظ بنجاح'); 
   };
   
   const deleteTeacher = (id: string) => { 
       setTeachers(prev => prev.filter(t => t.id !== id));
+      // 🔥 ADDED: Firebase Delete
+      deleteDoc(doc(db, 'teachers', id)).catch(e => console.error(e));
       showNotification('تم حذف المحفظ بنجاح'); 
   };
   
   const markLogsAsSeen = (studentId: string, logIds: string[]) => { 
-      setStudents(prev => prev.map(s => {
-          if (s.id === studentId) {
-              const newLogs = s.logs.map(log => logIds.includes(log.id) ? { ...log, seenByParent: true, seenAt: new Date().toISOString() } : log);
-              return { ...s, logs: newLogs };
-          }
-          return s;
-      }));
+      setStudents(prev => {
+          const nextState = prev.map(s => {
+              if (s.id === studentId) {
+                  const newLogs = s.logs.map(log => logIds.includes(log.id) ? { ...log, seenByParent: true, seenAt: new Date().toISOString() } : log);
+                  const updatedStudent = { ...s, logs: newLogs };
+                  // 🔥 ADDED: Sync to Firebase
+                  setDoc(doc(db, 'students', updatedStudent.id), updatedStudent).catch(console.error);
+                  return updatedStudent;
+              }
+              return s;
+          });
+          return nextState;
+      });
       showNotification('تم تأكيد الاطلاع', 'success'); 
   };
   
   const addAnnouncement = (ann: Announcement) => { 
       setAnnouncements(prev => [ann, ...prev]);
+      // 🔥 ADDED: Firebase Save
+      setDoc(doc(db, 'announcements', ann.id), ann).catch(e => console.error(e));
   };
   
   const deleteAnnouncement = (id: string) => { 
       setAnnouncements(prev => prev.filter(a => a.id !== id));
+      // 🔥 ADDED: Firebase Delete
+      deleteDoc(doc(db, 'announcements', id)).catch(e => console.error(e));
       showNotification('تم حذف الإعلان'); 
   };
   
   const updateOrgSettings = (settings: OrgSettings) => {
       setOrgSettings(settings);
+      // 🔥 ADDED: Firebase Save
+      setDoc(doc(db, 'settings', 'orgSettings'), settings).catch(e => console.error(e));
   };
 
   const handlePublishAdab = (title: string, quizzes: QuizItem[]) => { 
@@ -377,54 +454,87 @@ const App: React.FC = () => {
       
       const newAnnouncement: Announcement = { id: 'ann_' + Date.now(), teacherId, teacherName, content: `***${title}\nيرجى من ولي الأمر مشاركة الطالب في حل أسئلة يوم الآداب الآن!`, date: todayIso, type: 'GENERAL' }; 
       addAnnouncement(newAnnouncement);
+      // 🔥 Firebase handled in addAnnouncement
       
       const newAdabSession: AdabSession = { id: newSessionId, title, quizzes, date: todayIso }; 
       setAdabArchive(prev => [newAdabSession, ...prev]);
+      // 🔥 ADDED: Firebase Save Session
+      setDoc(doc(db, 'adabArchive', newSessionId), newAdabSession).catch(console.error);
       
       // Update students
-      setStudents(prev => prev.map(s => {
-          if (s.teacherId === teacherId) {
-              const existingLogIndex = s.logs.findIndex(l => new Date(l.date).toDateString() === todayDateStr); 
-              const adabSessionData: AdabSession = { id: newSessionId, title: title, quizzes: quizzes, date: todayIso }; 
-              
-              let updatedLogs = [...s.logs];
-              if (existingLogIndex >= 0) { 
-                  updatedLogs[existingLogIndex] = { ...updatedLogs[existingLogIndex], isAdab: true, adabSession: adabSessionData, }; 
-              } else { 
-                  const newLog: DailyLog = { id: 'adab_' + Date.now() + Math.random(), date: todayIso, teacherId, teacherName, isAbsent: false, isAdab: true, adabSession: adabSessionData, seenByParent: false, notes: "" }; 
-                  updatedLogs = [newLog, ...s.logs]; 
-              }
-              return { ...s, logs: updatedLogs };
-          }
-          return s;
-      }));
+      setStudents(prev => {
+          const nextState = prev.map(s => {
+            if (s.teacherId === teacherId) {
+                const existingLogIndex = s.logs.findIndex(l => new Date(l.date).toDateString() === todayDateStr); 
+                const adabSessionData: AdabSession = { id: newSessionId, title: title, quizzes: quizzes, date: todayIso }; 
+                
+                let updatedLogs = [...s.logs];
+                if (existingLogIndex >= 0) { 
+                    updatedLogs[existingLogIndex] = { ...updatedLogs[existingLogIndex], isAdab: true, adabSession: adabSessionData, }; 
+                } else { 
+                    const newLog: DailyLog = { id: 'adab_' + Date.now() + Math.random(), date: todayIso, teacherId, teacherName, isAbsent: false, isAdab: true, adabSession: adabSessionData, seenByParent: false, notes: "" }; 
+                    updatedLogs = [newLog, ...s.logs]; 
+                }
+                const updatedStudent = { ...s, logs: updatedLogs };
+                // 🔥 ADDED: Sync Student to Firebase
+                setDoc(doc(db, 'students', updatedStudent.id), updatedStudent).catch(console.error);
+                return updatedStudent;
+            }
+            return s;
+        });
+        return nextState;
+      });
   };
   
   const handleEditAdab = (sessionId: string, title: string, quizzes: QuizItem[]) => { 
+      // Update Archive
+      const updatedSessionPartial = { title, quizzes };
       setAdabArchive(prev => prev.map(s => s.id === sessionId ? { ...s, title, quizzes } : s));
+      // 🔥 ADDED: Firebase Update
+      updateDoc(doc(db, 'adabArchive', sessionId), updatedSessionPartial).catch(console.error);
       
-      setStudents(prev => prev.map(student => { 
-          const newLogs = student.logs.map(log => { 
-              if (log.adabSession?.id === sessionId) { 
-                  return { ...log, adabSession: { ...log.adabSession!, title, quizzes }, seenByParent: false, parentQuizScore: undefined, parentQuizMax: undefined }; 
-              } return log; 
-          }); 
-          return { ...student, logs: newLogs }; 
-      }));
+      // Update Students logs
+      setStudents(prev => {
+          const nextState = prev.map(student => { 
+            const newLogs = student.logs.map(log => { 
+                if (log.adabSession?.id === sessionId) { 
+                    return { ...log, adabSession: { ...log.adabSession!, title, quizzes }, seenByParent: false, parentQuizScore: undefined, parentQuizMax: undefined }; 
+                } return log; 
+            }); 
+            const updatedStudent = { ...student, logs: newLogs };
+            // 🔥 ADDED: Only sync if logs changed? Doing for all to be safe here
+            if (student.logs !== newLogs) {
+                 setDoc(doc(db, 'students', updatedStudent.id), updatedStudent).catch(console.error);
+            }
+            return updatedStudent; 
+          });
+          return nextState;
+      });
   };
   
   const handleDeleteAdab = (sessionId: string) => { 
       setAdabArchive(prev => prev.filter(s => s.id !== sessionId));
+      // 🔥 ADDED: Firebase Delete
+      deleteDoc(doc(db, 'adabArchive', sessionId)).catch(console.error);
       
-      setStudents(prev => prev.map(student => { 
-          const newLogs = student.logs.map(log => { 
-              if (log.adabSession?.id === sessionId) { 
-                  if (log.isAbsent === false && !log.jadeed && !log.attendance) { return null; } 
-                  else { const { adabSession, parentQuizScore, parentQuizMax, ...rest } = log; return { ...rest, isAdab: false }; } 
-              } return log; 
-          }).filter(l => l !== null) as DailyLog[]; 
-          return { ...student, logs: newLogs }; 
-      }));
+      setStudents(prev => {
+        const nextState = prev.map(student => { 
+            const newLogs = student.logs.map(log => { 
+                if (log.adabSession?.id === sessionId) { 
+                    if (log.isAbsent === false && !log.jadeed && !log.attendance) { return null; } 
+                    else { const { adabSession, parentQuizScore, parentQuizMax, ...rest } = log; return { ...rest, isAdab: false }; } 
+                } return log; 
+            }).filter(l => l !== null) as DailyLog[]; 
+            
+            const updatedStudent = { ...student, logs: newLogs };
+            if (student.logs.length !== newLogs.length) {
+                // 🔥 ADDED: Sync
+                setDoc(doc(db, 'students', updatedStudent.id), updatedStudent).catch(console.error);
+            }
+            return updatedStudent; 
+        }); 
+        return nextState;
+      });
       showNotification('تم حذف درس الآداب بنجاح', 'success');
   };
   
@@ -433,6 +543,7 @@ const App: React.FC = () => {
       let content = ""; if (type === 'ADAB') { content = `***${payload?.title || "يوم الآداب الرائع"}\nتأكد من حضور ابنك اليوم حتى لا يقل في اختبار الشهر`; } else { content = "🎉 تنبيه هام: غداً إجازة رسمية للحلقة."; }
       const newAnnouncement: Announcement = { id: 'ann_' + Date.now(), teacherId, teacherName, content, date: new Date().toISOString(), type: 'GENERAL' }; 
       addAnnouncement(newAnnouncement);
+      // 🔥 Firebase handled in addAnnouncement
       if (type === 'ADAB') { } else { showNotification('تم إرسال تنبيه الإجازة', 'success'); }
   };
 
