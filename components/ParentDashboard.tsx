@@ -145,7 +145,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
     // Helper to format assignments fully
     const formatAssignment = (ass: QuranAssignment, hideGrade?: boolean, largeFont?: boolean) => {
-        if (!ass) return '';
+        if (!ass) return null; // FIX: Return null instead of empty string if undefined
         if (ass.type === 'MULTI') {
              return (
                  <div className="space-y-1">
@@ -410,8 +410,17 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                                     ) : log.isAbsent ? (
                                         <div className={`p-6 text-center ${log.notes?.includes('عذر') ? 'bg-orange-50' : 'bg-red-50'}`}>
                                             <p className={`font-bold text-lg ${log.notes?.includes('عذر') ? 'text-orange-700' : 'text-red-600'}`}>
-                                                {log.notes?.includes('عذر') || log.notes?.includes('تبليغ') ? 'غائب بعذر - جزاكم الله خيراً على تبليغ الشيخ' : 'غائب ❌'}
+                                                {log.notes?.includes('عذر') || log.notes?.includes('تبليغ') ? 'غائب بعذر - جزاكم الله خيراً على تبليغ الشيخ' : 'غائب عساه أن يكون بخير'}
                                             </p>
+                                            {/* Confirm view button even for absence */}
+                                            {!log.seenByParent && (
+                                                <button 
+                                                    onClick={() => onMarkSeen(student.id, [log.id])} 
+                                                    className="mt-3 bg-white border border-red-200 text-red-600 px-4 py-2 rounded-full text-xs font-bold shadow-sm hover:bg-red-50"
+                                                >
+                                                    تأكيد الاطلاع ✅
+                                                </button>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="p-4 grid gap-4">
@@ -423,13 +432,23 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                                                     ))}
                                                 </div>
                                             )}
-                                            {log.jadeed && (<div className="bg-primary/5 p-4 rounded-2xl border border-primary/10"><p className="text-xs text-primary font-bold mb-2">الحفظ الجديد</p>{formatAssignment(log.jadeed)}</div>)}
+                                            {log.jadeed && log.jadeed.name !== 'الفاتحة' && (<div className="bg-primary/5 p-4 rounded-2xl border border-primary/10"><p className="text-xs text-primary font-bold mb-2">الحفظ الجديد</p>{formatAssignment(log.jadeed)}</div>)}
                                             {log.murajaah && log.murajaah.length > 0 && (<div className="bg-secondary/5 p-4 rounded-2xl border border-secondary/10"><p className="text-xs text-secondaryDark font-bold mb-2">المراجعة</p>{log.murajaah.map((m, idx) => (<div key={idx} className="mb-2 last:mb-0 border-b border-secondary/10 pb-2 last:pb-0">{formatAssignment(m)}</div>))}</div>)}
                                             {log.notes && (
                                                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-sm text-gray-700 whitespace-pre-wrap">
                                                     <span className="font-bold block text-gray-400 text-xs mb-1">ملاحظات المعلم:</span>
                                                     {log.notes}
                                                 </div>
+                                            )}
+                                            
+                                            {/* Confirm View Button */}
+                                            {!log.seenByParent && (
+                                                <button 
+                                                    onClick={() => onMarkSeen(student.id, [log.id])} 
+                                                    className="w-full bg-green-50 text-green-700 border border-green-200 py-3 rounded-xl font-bold shadow-sm hover:bg-green-100 transition mt-2"
+                                                >
+                                                    تأكيد الاطلاع ✅
+                                                </button>
                                             )}
                                         </div>
                                     )}
@@ -599,7 +618,13 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                                         <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer} className="w-full rounded-xl py-3 shadow-lg">تأكيد الإجابة</Button>
                                     )}
                                     {quizStatus === 'CONFIRMING' && (
-                                        <Button onClick={handleConfirmAnswer} variant="secondary" className="w-full rounded-xl py-3 shadow-lg">هل أنت متأكد؟</Button>
+                                        // CHANGED: Explicit color for visibility
+                                        <button 
+                                            onClick={handleConfirmAnswer} 
+                                            className="w-full rounded-xl py-3 shadow-lg font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                                        >
+                                            هل أنت متأكد؟
+                                        </button>
                                     )}
                                     {quizStatus === 'RESULT' && (
                                         <Button onClick={handleNextQuestion} className="w-full rounded-xl py-3 shadow-lg">
@@ -616,15 +641,16 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     </div>
                 )}
 
-                {/* CONTACT BUTTON */}
+                {/* CONTACT BUTTON - REDESIGNED */}
                 <div className="fixed bottom-4 left-4 z-50">
                     <button 
                         onClick={() => {
                             const phone = teacherPhone || "201000000000"; 
-                            window.open(`https://wa.me/${phone}`, '_blank');
+                            window.open(`https://wa.me/2${phone}`, '_blank');
                         }}
-                        className="bg-[#25D366] text-white p-3 rounded-full shadow-lg hover:bg-[#20b85a] transition-all transform hover:scale-110 flex items-center justify-center"
+                        className="bg-[#134e28] text-white px-4 py-3 rounded-full shadow-lg hover:bg-[#0f3d1f] transition-all transform hover:scale-105 flex items-center gap-2 border border-white/20"
                     >
+                        <span className="text-sm font-bold">التواصل مع المحفظ</span>
                         <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="css-i6dzq1"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                     </button>
                 </div>

@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBy9-kDy0JnunaSubLm-VhliTGhP2jZs6o",
@@ -11,6 +11,11 @@ const firebaseConfig = {
   measurementId: "G-3DVF71VRBN"
 };
 
-// تهيئة التطبيق وقاعدة البيانات
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// هذا التعديل الجديد: تفعيل الكاش ليعمل أوفلاين ويرسل البيانات لاحقاً
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
