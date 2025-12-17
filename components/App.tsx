@@ -1,22 +1,65 @@
 
 import React, { useState, useEffect } from 'react';
-import { Student, AppState, UserRole, Teacher, DailyLog, Announcement, QuizItem, AdabSession } from '../types';
+import { Student, AppState, UserRole, Teacher, DailyLog, Announcement, QuizItem, AdabSession, OrgSettings } from '../types';
 import { INITIAL_STUDENTS, INITIAL_TEACHERS, DAYS_OF_WEEK, APP_VERSION } from '../constants';
 import { TeacherDashboard } from './TeacherDashboard';
 import { ParentDashboard } from './ParentDashboard';
 import { AdminDashboard } from './AdminDashboard';
 import { Button } from './Button';
 
-// Logo Component with Dynamic Title
-const Logo = ({ title }: { title: string }) => (
-  <div className="flex flex-col items-center mb-8">
-    <div className="w-24 h-24 bg-emerald-600 rounded-full flex items-center justify-center text-4xl shadow-lg mb-4 border-4 border-white animate-bounce-in">
-      🕌
-    </div>
-    <h1 className="text-4xl font-bold font-serif text-emerald-900 text-center">{title}</h1>
-    <p className="text-gray-500 mt-1 text-lg">رفيقك في رحلة القرآن</p>
-  </div>
-);
+// --- COMPONENTS ---
+
+// Text-Based Decorative Logo with Dynamic Styling
+const Logo = ({ title, settings }: { title: string, settings: OrgSettings }) => {
+    // Style Mapping
+    const fontClass = settings.font === 'Amiri' ? 'font-serif' : 'font-sans';
+    
+    const colorClasses = {
+        Gold: 'text-darkBrown',
+        Green: 'text-emerald-900',
+        Blue: 'text-blue-900'
+    };
+    
+    // Style Rendering
+    if (settings.styleType === 'Calligraphy') {
+        return (
+            <div className="flex flex-col items-center mb-10 relative z-10">
+                <div className="relative mb-4 p-4">
+                <h1 className={`text-6xl font-bold ${fontClass} ${colorClasses[settings.colorTheme]} text-center tracking-tighter leading-tight drop-shadow-md`} 
+                    style={{ textShadow: '2px 2px 0px rgba(0,0,0,0.1)' }}>
+                    {title}
+                </h1>
+                <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-current to-transparent opacity-50 ${colorClasses[settings.colorTheme]}`}></div>
+                </div>
+                <div className="flex items-center gap-3 opacity-70 mt-2">
+                    <span className={`h-[1px] w-8 bg-current opacity-50 ${colorClasses[settings.colorTheme]}`}></span>
+                    <p className={`text-xs font-bold tracking-widest uppercase ${colorClasses[settings.colorTheme]}`}>نظام المتابعة القرآني</p>
+                    <span className={`h-[1px] w-8 bg-current opacity-50 ${colorClasses[settings.colorTheme]}`}></span>
+                </div>
+            </div>
+        );
+    } else if (settings.styleType === 'Modern') {
+        return (
+            <div className="flex flex-col items-center mb-10 relative z-10">
+                <div className={`bg-white/80 p-4 rounded-2xl shadow-sm border border-white/50 backdrop-blur-sm`}>
+                    <h1 className={`text-4xl font-black ${fontClass} ${colorClasses[settings.colorTheme]} text-center tracking-wide`}>
+                        {title}
+                    </h1>
+                </div>
+                <p className="text-gray-500 text-xs mt-2 font-bold tracking-wider">SYSTEM V{APP_VERSION}</p>
+            </div>
+        );
+    } else {
+        // Simple
+        return (
+            <div className="flex flex-col items-center mb-8 relative z-10">
+                <h1 className={`text-3xl font-bold ${fontClass} ${colorClasses[settings.colorTheme]} text-center`}>
+                    {title}
+                </h1>
+            </div>
+        );
+    }
+};
 
 const NotificationToast = ({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) => {
   useEffect(() => {
@@ -27,11 +70,11 @@ const NotificationToast = ({ message, type, onClose }: { message: string, type: 
   }, [onClose]);
 
   return (
-    <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-3 animate-slide-down min-w-[300px] justify-center ${
-      type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+    <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-3 animate-slide-down min-w-[300px] justify-center border-2 ${
+      type === 'success' ? 'bg-primary text-white border-primaryDark' : 'bg-red-600 text-white border-red-800'
     }`}>
-      <span className="text-2xl">{type === 'success' ? '✅' : '⚠️'}</span>
-      <span className="font-bold">{message}</span>
+      <span className="text-2xl">{type === 'success' ? '✨' : '⚠️'}</span>
+      <span className="font-bold font-serif">{message}</span>
     </div>
   );
 };
@@ -41,37 +84,60 @@ const normalizeArabicNumbers = (str: string) => {
 };
 
 const App: React.FC = () => {
-  // --- DATA LOADING & STATE ---
-  // RESET TO CLASSIC VERSION v100
+  // --- DATA LOADING & STATE FROM LOCAL STORAGE ---
   const [students, setStudents] = useState<Student[]>(() => {
-    const saved = localStorage.getItem('muhaffiz_students_v100');
-    return saved ? JSON.parse(saved) : INITIAL_STUDENTS;
+      try {
+          const saved = localStorage.getItem('muhaffiz_students_v3');
+          return saved ? JSON.parse(saved) : INITIAL_STUDENTS;
+      } catch { return INITIAL_STUDENTS; }
   });
 
   const [teachers, setTeachers] = useState<Teacher[]>(() => {
-      const saved = localStorage.getItem('muhaffiz_teachers_v100');
-      return saved ? JSON.parse(saved) : INITIAL_TEACHERS;
+      try {
+          const saved = localStorage.getItem('muhaffiz_teachers_v3');
+          return saved ? JSON.parse(saved) : INITIAL_TEACHERS;
+      } catch { return INITIAL_TEACHERS; }
   });
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
-      const saved = localStorage.getItem('muhaffiz_announcements_v100');
-      return saved ? JSON.parse(saved) : [];
+      try {
+          const saved = localStorage.getItem('muhaffiz_announcements_v3');
+          return saved ? JSON.parse(saved) : [];
+      } catch { return []; }
   });
 
-  // New Adab Archive State
   const [adabArchive, setAdabArchive] = useState<AdabSession[]>(() => {
-      const saved = localStorage.getItem('muhaffiz_adab_archive');
-      return saved ? JSON.parse(saved) : [];
+      try {
+          const saved = localStorage.getItem('muhaffiz_adab_archive_v3');
+          return saved ? JSON.parse(saved) : [];
+      } catch { return []; }
+  });
+  
+  // Org Settings State
+  const [orgSettings, setOrgSettings] = useState<OrgSettings>(() => {
+      try {
+          const saved = localStorage.getItem('muhaffiz_settings_v3');
+          return saved ? JSON.parse(saved) : { 
+              name: "دار التوحيد", 
+              font: 'Amiri', 
+              colorTheme: 'Gold', 
+              styleType: 'Calligraphy' 
+          };
+      } catch {
+          return { name: "دار التوحيد", font: 'Amiri', colorTheme: 'Gold', styleType: 'Calligraphy' };
+      }
   });
 
-  const [organizationName, setOrganizationName] = useState(() => {
-      return localStorage.getItem('muhaffiz_org_name') || "دار التوحيد";
-  });
+  // PERSISTENCE EFFECTS
+  useEffect(() => { localStorage.setItem('muhaffiz_students_v3', JSON.stringify(students)); }, [students]);
+  useEffect(() => { localStorage.setItem('muhaffiz_teachers_v3', JSON.stringify(teachers)); }, [teachers]);
+  useEffect(() => { localStorage.setItem('muhaffiz_announcements_v3', JSON.stringify(announcements)); }, [announcements]);
+  useEffect(() => { localStorage.setItem('muhaffiz_adab_archive_v3', JSON.stringify(adabArchive)); }, [adabArchive]);
+  useEffect(() => { localStorage.setItem('muhaffiz_settings_v3', JSON.stringify(orgSettings)); }, [orgSettings]);
 
   useEffect(() => {
-      localStorage.setItem('muhaffiz_org_name', organizationName);
-      document.title = `${organizationName} - متابعة القرآن الكريم`;
-  }, [organizationName]);
+      document.title = `${orgSettings.name} - متابعة القرآن الكريم`;
+  }, [orgSettings]);
 
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -106,20 +172,19 @@ const App: React.FC = () => {
     if (outcome === 'accepted') { setDeferredPrompt(null); }
   };
 
-  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [appState, setAppState] = useState<AppState>({ students: students, teachers: teachers, announcements: announcements, adabArchive: adabArchive, orgSettings: orgSettings, currentUser: { role: 'GUEST' } });
 
+  // Update appState when data changes
   useEffect(() => {
-    const storedVersion = localStorage.getItem('app_version');
-    if (storedVersion && storedVersion !== APP_VERSION) { setUpdateAvailable(true); }
-    localStorage.setItem('app_version', APP_VERSION);
-  }, []);
-
-  useEffect(() => { localStorage.setItem('muhaffiz_students_v100', JSON.stringify(students)); }, [students]);
-  useEffect(() => { localStorage.setItem('muhaffiz_teachers_v100', JSON.stringify(teachers)); }, [teachers]);
-  useEffect(() => { localStorage.setItem('muhaffiz_announcements_v100', JSON.stringify(announcements)); }, [announcements]);
-  useEffect(() => { localStorage.setItem('muhaffiz_adab_archive', JSON.stringify(adabArchive)); }, [adabArchive]);
-
-  const [appState, setAppState] = useState<AppState>({ students: students, teachers: teachers, announcements: announcements, adabArchive: adabArchive, currentUser: { role: 'GUEST' } });
+      setAppState(prev => ({
+          ...prev,
+          students,
+          teachers,
+          announcements,
+          adabArchive,
+          orgSettings
+      }));
+  }, [students, teachers, announcements, adabArchive, orgSettings]);
 
   // --- LOGIN & NAVIGATION STATE ---
   const [loginView, setLoginView] = useState<'SELECTION' | 'PARENT' | 'TEACHER' | 'ADMIN'>('SELECTION');
@@ -157,7 +222,6 @@ const App: React.FC = () => {
       
       const cleanCode = normalizeArabicNumbers(parentCodeInput.trim());
       
-      // Strict check: Teacher + Code must match
       const student = students.find(s => s.parentCode === cleanCode && s.teacherId === parentSelectedTeacher); 
       
       if (student) { 
@@ -179,20 +243,17 @@ const App: React.FC = () => {
       } 
   };
   
-  const handleCompleteParentProfile = (e: React.FormEvent) => { 
+  const handleCompleteParentProfile = async (e: React.FormEvent) => { 
       e.preventDefault(); 
       const cleanPhone = normalizeArabicNumbers(parentPhoneInput.trim());
       if (!cleanPhone || cleanPhone.length < 10) { setLoginError('يرجى كتابة رقم هاتف صحيح'); return; } 
       
       if (pendingStudentId) { 
-          const student = students.find(s => s.id === pendingStudentId); 
-          if (student) { 
-              const newStudents = students.map(s => s.id === student.id ? { ...s, parentPhone: cleanPhone } : s); 
-              setStudents(newStudents); 
-              setAppState(prev => ({ ...prev, currentUser: { role: 'PARENT', id: student.id, name: student.name } })); 
-              setShowPhoneSetup(false); 
-              setPendingStudentId(null); 
-          } 
+          const updatedStudent = { ...students.find(s => s.id === pendingStudentId)!, parentPhone: cleanPhone };
+          updateStudent(updatedStudent);
+          setAppState(prev => ({ ...prev, currentUser: { role: 'PARENT', id: updatedStudent.id, name: updatedStudent.name } })); 
+          setShowPhoneSetup(false); 
+          setPendingStudentId(null); 
       } 
   };
   
@@ -219,222 +280,165 @@ const App: React.FC = () => {
       setShowPhoneSetup(false); 
   };
 
-  // --- DATA OPERATIONS ---
-  const updateStudent = (updatedStudent: Student) => { const newStudents = students.map(s => s.id === updatedStudent.id ? updatedStudent : s); setStudents(newStudents); };
-  const deleteStudents = (studentIds: string[]) => { setStudents(prevStudents => { const remaining = prevStudents.filter(s => !studentIds.includes(s.id)); return [...remaining]; }); showNotification('تم حذف الطالب بنجاح'); };
+  // --- DATA OPERATIONS (LOCAL STORAGE) ---
+  const updateStudent = (updatedStudent: Student) => { 
+      setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+  };
   
-  const markRemainingStudentsAbsent = () => { 
+  const deleteStudents = (studentIds: string[]) => { 
+      setStudents(prev => prev.filter(s => !studentIds.includes(s.id)));
+      showNotification('تم حذف الطالب بنجاح'); 
+  };
+  
+  const markRemainingStudentsAbsent = (absentIds: string[], excusedIds: string[]) => { 
     const teacherId = appState.currentUser.id || 'unknown'; 
     const teacherName = appState.currentUser.name || 'المعلم'; 
-    const todayString = new Date().toDateString(); 
-    let count = 0; 
-    const studentsToMarkIds: string[] = []; 
     
-    // Check logs properly
-    students.forEach(student => { 
-        if (student.teacherId !== teacherId) return; 
-        const hasLogToday = student.logs.some(log => new Date(log.date).toDateString() === todayString); 
-        if (!hasLogToday) { 
-            studentsToMarkIds.push(student.id); 
-        } 
-    }); 
-    
-    if (studentsToMarkIds.length === 0) { 
-        showNotification("تم تسجيل جميع الطلاب لهذا اليوم بالفعل.", 'success'); 
-        return; 
-    } 
-    
-    if (!window.confirm(`سيتم تسجيل الغياب لـ ${studentsToMarkIds.length} طالب لم يسجلوا اليوم. هل أنت متأكد؟`)) { 
-        return; 
-    } 
-    
-    setStudents(prevStudents => { 
-        return prevStudents.map(student => { 
-            if (studentsToMarkIds.includes(student.id)) { 
-                count++; 
-                const absentLog: DailyLog = { 
-                    id: 'absent_' + Date.now() + Math.random(), 
-                    date: new Date().toISOString(), 
-                    teacherId, 
-                    teacherName, 
-                    seenByParent: false, 
-                    isAbsent: true, 
-                    notes: 'تم تسجيل الغياب تلقائياً لعدم الحضور.' 
-                }; 
-                return { ...student, logs: [absentLog, ...student.logs] }; 
-            } 
-            return student; 
-        }); 
-    }); 
-    showNotification(`تم تسجيل الغياب لـ ${studentsToMarkIds.length} طالب بنجاح`, 'success'); 
+    setStudents(prev => prev.map(student => {
+        if (absentIds.includes(student.id) || excusedIds.includes(student.id)) {
+            let note = "";
+            if (absentIds.includes(student.id)) note = "غياب غير مبرر";
+            else note = "غائب بعذر - جزاكم الله خيراً على تبليغ الشيخ";
+            
+            const log: DailyLog = { 
+                id: 'absent_' + Date.now() + Math.random(), 
+                date: new Date().toISOString(), 
+                teacherId, 
+                teacherName, 
+                seenByParent: false, 
+                isAbsent: true, 
+                notes: note 
+            };
+            return { ...student, logs: [log, ...student.logs] };
+        }
+        return student;
+    }));
+    showNotification(`تم تسجيل الغياب لـ ${absentIds.length + excusedIds.length} طالب`, 'success'); 
+  };
+  
+  const addStudent = (name: string, code: string) => { 
+      const newStudent: Student = { 
+          id: 's_' + Date.now() + Math.random(), 
+          teacherId: appState.currentUser.id || 't1', 
+          name: name, 
+          parentCode: code, 
+          weeklySchedule: DAYS_OF_WEEK.map(d => ({ day: d, events: [] })), 
+          payments: [], 
+          logs: [] 
+      }; 
+      setStudents(prev => [newStudent, ...prev]);
+      return newStudent; 
+  };
+  
+  const addTeacher = (name: string, loginCode: string, phone: string) => { 
+      const newTeacher: Teacher = { id: 't_' + Date.now(), name, loginCode, phone }; 
+      setTeachers(prev => [...prev, newTeacher]);
+      showNotification('تم إضافة المحفظ بنجاح'); 
+  };
+  
+  const updateTeacher = (id: string, name: string, loginCode: string, phone: string) => { 
+      setTeachers(prev => prev.map(t => t.id === id ? { ...t, name, loginCode, phone } : t));
+      showNotification('تم تعديل بيانات المحفظ بنجاح'); 
+  };
+  
+  const deleteTeacher = (id: string) => { 
+      setTeachers(prev => prev.filter(t => t.id !== id));
+      showNotification('تم حذف المحفظ بنجاح'); 
+  };
+  
+  const markLogsAsSeen = (studentId: string, logIds: string[]) => { 
+      setStudents(prev => prev.map(s => {
+          if (s.id === studentId) {
+              const newLogs = s.logs.map(log => logIds.includes(log.id) ? { ...log, seenByParent: true, seenAt: new Date().toISOString() } : log);
+              return { ...s, logs: newLogs };
+          }
+          return s;
+      }));
+      showNotification('تم تأكيد الاطلاع', 'success'); 
+  };
+  
+  const addAnnouncement = (ann: Announcement) => { 
+      setAnnouncements(prev => [ann, ...prev]);
+  };
+  
+  const deleteAnnouncement = (id: string) => { 
+      setAnnouncements(prev => prev.filter(a => a.id !== id));
+      showNotification('تم حذف الإعلان'); 
+  };
+  
+  const updateOrgSettings = (settings: OrgSettings) => {
+      setOrgSettings(settings);
   };
 
-  const addStudent = (name: string, code: string) => { const newStudent: Student = { id: 's_' + Date.now() + Math.random(), teacherId: appState.currentUser.id || 't1', name: name, parentCode: code, weeklySchedule: DAYS_OF_WEEK.map(d => ({ day: d, events: [] })), payments: [], logs: [] }; setStudents([newStudent, ...students]); return newStudent; };
-  const addTeacher = (name: string, loginCode: string) => { const newTeacher: Teacher = { id: 't_' + Date.now(), name, loginCode }; setTeachers(prev => [...prev, newTeacher]); showNotification('تم إضافة المحفظ بنجاح'); };
-  const updateTeacher = (id: string, name: string, loginCode: string) => { setTeachers(prev => prev.map(t => t.id === id ? { ...t, name, loginCode } : t )); showNotification('تم تعديل بيانات المحفظ بنجاح'); };
-  const deleteTeacher = (id: string) => { setTeachers(prevTeachers => { const remaining = prevTeachers.filter(t => t.id !== id); return [...remaining]; }); showNotification('تم حذف المحفظ بنجاح'); };
-  const markLogsAsSeen = (studentId: string, logIds: string[]) => { const studentIndex = students.findIndex(s => s.id === studentId); if (studentIndex === -1) return; const student = students[studentIndex]; const studentLogs = student.logs.map(log => { if (logIds.includes(log.id)) { return { ...log, seenByParent: true, seenAt: new Date().toISOString() }; } return log; }); const updatedStudent = { ...student, logs: studentLogs }; updateStudent(updatedStudent); showNotification('تم تأكيد الاطلاع', 'success'); };
-  const addAnnouncement = (ann: Announcement) => { setAnnouncements(prev => [ann, ...prev]); };
-  const deleteAnnouncement = (id: string) => { setAnnouncements(prev => prev.filter(a => a.id !== id)); showNotification('تم حذف الإعلان'); };
-
-  const handlePublishAdab = (title: string, quizzes: QuizItem[]) => {
-      const teacherId = appState.currentUser.id;
-      const teacherName = appState.currentUser.name || 'المعلم';
-      if (!teacherId) return;
-
-      const todayIso = new Date().toISOString();
-      const todayDateStr = new Date().toDateString();
-      const newSessionId = 'adab_sess_' + Date.now();
-
-      // 1. Create General Announcement
-      const newAnnouncement: Announcement = {
-          id: 'ann_' + Date.now(),
-          teacherId,
-          teacherName,
-          content: `***${title}\nيرجى من ولي الأمر مشاركة الطالب في حل أسئلة يوم الآداب الآن!`,
-          date: todayIso,
-          type: 'GENERAL'
-      };
+  const handlePublishAdab = (title: string, quizzes: QuizItem[]) => { 
+      const teacherId = appState.currentUser.id; const teacherName = appState.currentUser.name || 'المعلم'; if (!teacherId) return;
+      const todayIso = new Date().toISOString(); const todayDateStr = new Date().toDateString(); const newSessionId = 'adab_sess_' + Date.now();
+      
+      const newAnnouncement: Announcement = { id: 'ann_' + Date.now(), teacherId, teacherName, content: `***${title}\nيرجى من ولي الأمر مشاركة الطالب في حل أسئلة يوم الآداب الآن!`, date: todayIso, type: 'GENERAL' }; 
       addAnnouncement(newAnnouncement);
       
-      // 2. New: Add to Archive
-      const newAdabSession: AdabSession = {
-          id: newSessionId,
-          title,
-          quizzes,
-          date: todayIso
-      };
+      const newAdabSession: AdabSession = { id: newSessionId, title, quizzes, date: todayIso }; 
       setAdabArchive(prev => [newAdabSession, ...prev]);
-
-      // 3. Update Students Logs
-      setStudents(prevStudents => prevStudents.map(s => {
+      
+      // Update students
+      setStudents(prev => prev.map(s => {
           if (s.teacherId === teacherId) {
-              const existingLogIndex = s.logs.findIndex(l => new Date(l.date).toDateString() === todayDateStr);
+              const existingLogIndex = s.logs.findIndex(l => new Date(l.date).toDateString() === todayDateStr); 
+              const adabSessionData: AdabSession = { id: newSessionId, title: title, quizzes: quizzes, date: todayIso }; 
               
-              // New Adab Session Data with ID
-              const adabSessionData: AdabSession = {
-                  id: newSessionId,
-                  title: title,
-                  quizzes: quizzes,
-                  date: todayIso
-              };
-
-              // If log exists for today, UPDATE it to include Adab
-              if (existingLogIndex >= 0) {
-                  const updatedLogs = [...s.logs];
-                  updatedLogs[existingLogIndex] = {
-                      ...updatedLogs[existingLogIndex],
-                      isAdab: true, 
-                      adabSession: adabSessionData,
-                  };
-                  return { ...s, logs: updatedLogs };
-              } else {
-                  // Create NEW log
-                  const newLog: DailyLog = {
-                      id: 'adab_' + Date.now() + Math.random(),
-                      date: todayIso,
-                      teacherId,
-                      teacherName,
-                      isAbsent: false,
-                      isAdab: true,
-                      adabSession: adabSessionData,
-                      seenByParent: false,
-                      notes: ""
-                  };
-                  return { ...s, logs: [newLog, ...s.logs] };
+              let updatedLogs = [...s.logs];
+              if (existingLogIndex >= 0) { 
+                  updatedLogs[existingLogIndex] = { ...updatedLogs[existingLogIndex], isAdab: true, adabSession: adabSessionData, }; 
+              } else { 
+                  const newLog: DailyLog = { id: 'adab_' + Date.now() + Math.random(), date: todayIso, teacherId, teacherName, isAbsent: false, isAdab: true, adabSession: adabSessionData, seenByParent: false, notes: "" }; 
+                  updatedLogs = [newLog, ...s.logs]; 
               }
+              return { ...s, logs: updatedLogs };
           }
           return s;
       }));
   };
-
-  const handleEditAdab = (sessionId: string, title: string, quizzes: QuizItem[]) => {
-      // 1. Update Archive
+  
+  const handleEditAdab = (sessionId: string, title: string, quizzes: QuizItem[]) => { 
       setAdabArchive(prev => prev.map(s => s.id === sessionId ? { ...s, title, quizzes } : s));
-
-      // 2. Update Student Logs and Reset Parent Interaction
-      setStudents(prevStudents => prevStudents.map(student => {
-          const hasThisAdab = student.logs.some(l => l.adabSession?.id === sessionId);
-          if (hasThisAdab) {
-              const newLogs = student.logs.map(log => {
-                  if (log.adabSession?.id === sessionId) {
-                      return {
-                          ...log,
-                          adabSession: { ...log.adabSession!, title, quizzes },
-                          // RESET PARENT INTERACTION
-                          seenByParent: false,
-                          parentQuizScore: undefined,
-                          parentQuizMax: undefined
-                      };
-                  }
-                  return log;
-              });
-              return { ...student, logs: newLogs };
-          }
-          return student;
+      
+      setStudents(prev => prev.map(student => { 
+          const newLogs = student.logs.map(log => { 
+              if (log.adabSession?.id === sessionId) { 
+                  return { ...log, adabSession: { ...log.adabSession!, title, quizzes }, seenByParent: false, parentQuizScore: undefined, parentQuizMax: undefined }; 
+              } return log; 
+          }); 
+          return { ...student, logs: newLogs }; 
       }));
   };
-
-  const handleDeleteAdab = (sessionId: string) => {
-      // 1. Remove from Archive
+  
+  const handleDeleteAdab = (sessionId: string) => { 
       setAdabArchive(prev => prev.filter(s => s.id !== sessionId));
-
-      // 2. Remove from Student Logs
-      setStudents(prevStudents => prevStudents.map(student => {
-          // Filter out logs that are ONLY Adab for this session, or remove Adab property if mixed
-          const newLogs = student.logs.map(log => {
-              if (log.adabSession?.id === sessionId) {
-                  if (log.isAbsent === false && !log.jadeed && !log.attendance) {
-                      // Pure Adab log -> Remove it entirely (mark for filtering)
-                      return null;
-                  } else {
-                      // Mixed log -> Remove Adab properties
-                      const { adabSession, parentQuizScore, parentQuizMax, ...rest } = log;
-                      return { ...rest, isAdab: false };
-                  }
-              }
-              return log;
-          }).filter(l => l !== null) as DailyLog[];
-          
-          return { ...student, logs: newLogs };
+      
+      setStudents(prev => prev.map(student => { 
+          const newLogs = student.logs.map(log => { 
+              if (log.adabSession?.id === sessionId) { 
+                  if (log.isAbsent === false && !log.jadeed && !log.attendance) { return null; } 
+                  else { const { adabSession, parentQuizScore, parentQuizMax, ...rest } = log; return { ...rest, isAdab: false }; } 
+              } return log; 
+          }).filter(l => l !== null) as DailyLog[]; 
+          return { ...student, logs: newLogs }; 
       }));
       showNotification('تم حذف درس الآداب بنجاح', 'success');
   };
-
-  const handleQuickAnnouncement = (type: 'ADAB' | 'HOLIDAY', payload?: any) => {
-      const teacherId = appState.currentUser.id;
-      const teacherName = appState.currentUser.name || 'المعلم';
-      if (!teacherId) return;
-
-      let content = "";
-      if (type === 'ADAB') {
-          content = `***${payload?.title || "يوم الآداب الرائع"}\nتأكد من حضور ابنك اليوم حتى لا يقل في اختبار الشهر`;
-      } else {
-          content = "🎉 تنبيه هام: غداً إجازة رسمية للحلقة.";
-      }
-
-      const newAnnouncement: Announcement = {
-          id: 'ann_' + Date.now(),
-          teacherId,
-          teacherName,
-          content,
-          date: new Date().toISOString(),
-          type: 'GENERAL'
-      };
-      
+  
+  const handleQuickAnnouncement = (type: 'ADAB' | 'HOLIDAY', payload?: any) => { 
+      const teacherId = appState.currentUser.id; const teacherName = appState.currentUser.name || 'المعلم'; if (!teacherId) return;
+      let content = ""; if (type === 'ADAB') { content = `***${payload?.title || "يوم الآداب الرائع"}\nتأكد من حضور ابنك اليوم حتى لا يقل في اختبار الشهر`; } else { content = "🎉 تنبيه هام: غداً إجازة رسمية للحلقة."; }
+      const newAnnouncement: Announcement = { id: 'ann_' + Date.now(), teacherId, teacherName, content, date: new Date().toISOString(), type: 'GENERAL' }; 
       addAnnouncement(newAnnouncement);
-      
-      if (type === 'ADAB') {
-          // Legacy support if needed, but onPublishAdab handles the new quiz flow
-      } else {
-          showNotification('تم إرسال تنبيه الإجازة', 'success');
-      }
+      if (type === 'ADAB') { } else { showNotification('تم إرسال تنبيه الإجازة', 'success'); }
   };
 
   return (
       <>
         {!isOnline && (
-            <div className="bg-gray-800 text-white text-center text-sm p-1 fixed top-0 left-0 right-0 z-[110]">
+            <div className="bg-darkBrown text-paper text-center text-xs p-1 fixed top-0 left-0 right-0 z-[110] border-b border-secondary">
                 📡 وضع عدم الاتصال: البيانات تحفظ محلياً
             </div>
         )}
@@ -456,8 +460,8 @@ const App: React.FC = () => {
                 onDeleteTeacher={deleteTeacher}
                 onLogout={handleLogout}
                 onShowNotification={showNotification}
-                organizationName={organizationName}
-                onUpdateOrganizationName={setOrganizationName}
+                orgSettings={orgSettings}
+                onUpdateOrgSettings={updateOrgSettings}
             />
         ) : appState.currentUser.role === 'TEACHER' ? (
             <TeacherDashboard 
@@ -466,10 +470,7 @@ const App: React.FC = () => {
                 students={students.filter(s => s.teacherId === appState.currentUser.id)}
                 allTeachers={teachers} 
                 announcements={announcements}
-                adabArchive={adabArchive.filter(s => {
-                    // Filter archive based on logs or show all
-                    return true;
-                })}
+                adabArchive={adabArchive.filter(s => { return true; })}
                 onUpdateStudent={updateStudent}
                 onAddStudent={addStudent}
                 onDeleteStudents={deleteStudents}
@@ -490,185 +491,217 @@ const App: React.FC = () => {
                 onUpdateStudent={updateStudent}
                 onLogout={handleLogout}
                 onMarkSeen={markLogsAsSeen}
+                teachers={teachers}
+                // NEW: Pass filtered students for leaderboard calculation (Teacher Isolation)
+                allStudents={students.filter(s => s.teacherId === students.find(me => me.id === appState.currentUser.id)?.teacherId)}
             />
         ) : (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 px-4 pt-8 pb-12 overflow-y-auto">
-            <div className="bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-xl max-w-md w-full border border-white">
-                <Logo title={organizationName} />
+            <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 overflow-y-auto relative font-sans">
+              {/* Login View */}
+              
+              <div className="max-w-md w-full relative z-10 animate-fade-in pb-12">
+                <div className="bg-paper p-8 rounded-[40px] shadow-2xl border-2 border-white/50 backdrop-blur-sm relative overflow-hidden">
+                   
+                   {/* Top decorative element */}
+                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-2 bg-primary/20 rounded-b-full"></div>
 
-                {!showPhoneSetup ? (
-                    <>
-                        {/* MAIN SELECTION VIEW */}
-                        {loginView === 'SELECTION' && (
-                            <div className="space-y-4 animate-fade-in">
-                                <button 
-                                    onClick={() => { setLoginView('PARENT'); setLoginError(''); }}
-                                    className="w-full bg-white hover:bg-emerald-50 border-2 border-emerald-100 p-6 rounded-xl shadow-sm transition-all transform hover:scale-[1.02] flex items-center gap-4 group"
-                                >
-                                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-2xl group-hover:bg-emerald-200 transition">👨‍👩‍👧‍👦</div>
-                                    <div className="text-right">
-                                        <h3 className="font-bold text-lg text-emerald-900">دخول ولي الأمر</h3>
-                                        <p className="text-sm text-gray-500">تابع تقدم ابنك وتواصل مع المعلم</p>
-                                    </div>
-                                    <span className="mr-auto text-emerald-300 text-xl group-hover:text-emerald-500">⬅</span>
-                                </button>
+                   <Logo title={orgSettings.name} settings={orgSettings} />
 
-                                <button 
-                                    onClick={() => { setLoginView('TEACHER'); setLoginError(''); }}
-                                    className="w-full bg-white hover:bg-blue-50 border-2 border-blue-100 p-6 rounded-xl shadow-sm transition-all transform hover:scale-[1.02] flex items-center gap-4 group"
-                                >
-                                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl group-hover:bg-blue-200 transition">👳‍♂️</div>
-                                    <div className="text-right">
-                                        <h3 className="font-bold text-lg text-blue-900">دخول المعلم</h3>
-                                        <p className="text-sm text-gray-500">إدارة الحلقة وتسجيل الطلاب</p>
-                                    </div>
-                                    <span className="mr-auto text-blue-300 text-xl group-hover:text-blue-500">⬅</span>
-                                </button>
-                                
-                                <div className="mt-8 text-center pt-4 border-t border-gray-100">
-                                    <button onClick={() => setLoginView('ADMIN')} className="text-xs text-gray-400 hover:text-gray-600 font-bold">
-                                        🔐 دخول المسؤول (المبرمج)
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                   <div className="text-center mb-8">
+                      <h2 className="text-lg font-bold text-darkBrown/80 font-serif">اختر طريقة الدخول للمتابعة</h2>
+                   </div>
 
-                        {/* LOGIN FORMS */}
-                        <div className="space-y-8">
-                        {loginView === 'PARENT' && (
-                            <form onSubmit={handleParentLogin} className="space-y-4 animate-slide-up relative pt-2">
-                                <div className="flex items-center mb-6 border-b border-emerald-50 pb-4">
-                                    <button type="button" onClick={() => setLoginView('SELECTION')} className="bg-gray-100 hover:bg-gray-200 text-gray-700 w-10 h-10 rounded-full flex items-center justify-center transition shadow-sm">
-                                        <span className="text-xl font-bold">➜</span>
-                                    </button>
-                                    <h3 className="flex-1 text-center font-bold text-emerald-800 text-xl">تسجيل دخول ولي الأمر</h3>
-                                    <div className="w-10"></div> {/* Spacer for centering */}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-1">اختر اسم المعلم (الشيخ)</label>
-                                    <select 
-                                    className="w-full p-3 border border-gray-300 rounded-lg bg-white"
-                                    value={parentSelectedTeacher}
-                                    onChange={(e) => setParentSelectedTeacher(e.target.value)}
-                                    >
-                                    <option value="">-- اختر الاسم --</option>
-                                    {teachers.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                    </select>
-                                </div>
-                                <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">كود الطالب</label>
-                                <input 
-                                    type="text"
-                                    placeholder="أدخل الكود"
-                                    className="w-full p-3 border border-gray-300 rounded-lg text-center text-lg tracking-widest focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    value={parentCodeInput}
-                                    onChange={(e) => setParentCodeInput(e.target.value)}
-                                />
-                                </div>
-                                {loginError && <p className="text-red-500 text-sm text-center font-bold bg-red-50 p-2 rounded border border-red-100">{loginError}</p>}
-                                <Button type="submit" className="w-full text-lg">دخول</Button>
-                            </form>
-                        )}
+                   {!showPhoneSetup ? (
+                       <div className="space-y-6">
+                           {loginView === 'SELECTION' && (
+                               <div className="space-y-5">
+                                   {/* BUTTON 1: PARENT */}
+                                   <button 
+                                       onClick={() => { setLoginView('PARENT'); setLoginError(''); }}
+                                       className="w-full bg-gradient-to-br from-primary to-primaryDark text-white p-6 rounded-3xl shadow-soft transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center group relative overflow-hidden border border-white/10"
+                                   >
+                                       {/* Texture */}
+                                       <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                                       
+                                       <div className="flex flex-col items-center relative z-10 gap-2">
+                                           <h3 className="font-bold text-3xl font-serif">ولي الأمر</h3>
+                                           <p className="text-xs text-white/80 opacity-90 tracking-wide">متابعة مستوى الأبناء</p>
+                                       </div>
+                                       
+                                       {/* Decorative Circles */}
+                                       <div className="absolute -left-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                                       <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
+                                   </button>
+                                   
+                                   {/* BUTTON 2: TEACHER */}
+                                   <button 
+                                       onClick={() => { setLoginView('TEACHER'); setLoginError(''); }}
+                                       className="w-full bg-gradient-to-br from-secondary to-secondaryDark text-white p-6 rounded-3xl shadow-soft transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center group relative overflow-hidden border border-white/10"
+                                   >
+                                       {/* Texture */}
+                                       <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                                       
+                                       <div className="flex flex-col items-center relative z-10 gap-2">
+                                           <h3 className="font-bold text-3xl font-serif">المعلم</h3>
+                                           <p className="text-xs text-white/80 opacity-90 tracking-wide">إدارة الحلقة والطلاب</p>
+                                       </div>
 
-                        {loginView === 'TEACHER' && (
-                            <form onSubmit={handleTeacherLogin} className="space-y-4 animate-slide-up relative pt-2">
-                                <div className="flex items-center mb-6 border-b border-blue-50 pb-4">
-                                    <button type="button" onClick={() => setLoginView('SELECTION')} className="bg-gray-100 hover:bg-gray-200 text-gray-700 w-10 h-10 rounded-full flex items-center justify-center transition shadow-sm">
-                                        <span className="text-xl font-bold">➜</span>
-                                    </button>
-                                    <h3 className="flex-1 text-center font-bold text-blue-800 text-xl">تسجيل دخول المعلم</h3>
-                                    <div className="w-10"></div> {/* Spacer for centering */}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-1 text-center">اختر اسم المعلم</label>
-                                    <select 
-                                    className="w-full p-3 border border-gray-300 rounded-lg bg-white"
-                                    value={selectedTeacherId}
-                                    onChange={(e) => setSelectedTeacherId(e.target.value)}
-                                    >
-                                    <option value="">-- اختر الاسم --</option>
-                                    {teachers.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-1 text-center">الرقم الخاص (كود الدخول)</label>
-                                    <input 
-                                        type="password"
-                                        className="w-full p-3 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
-                                        value={teacherCodeInput}
-                                        onChange={(e) => setTeacherCodeInput(e.target.value)}
-                                        placeholder="******"
-                                    />
-                                </div>
-                                {loginError && <p className="text-red-500 text-sm text-center font-bold bg-red-50 p-2 rounded border border-red-100">{loginError}</p>}
-                                <Button variant="secondary" type="submit" className="w-full" disabled={!selectedTeacherId}>
-                                    دخول
-                                </Button>
-                            </form>
-                        )}
+                                        {/* Decorative Circles */}
+                                       <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+                                       <div className="absolute -left-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
+                                   </button>
 
-                        {loginView === 'ADMIN' && (
-                            <form onSubmit={handleAdminLogin} className="space-y-4 animate-slide-up relative border-t pt-4 mt-4">
-                                <button type="button" onClick={() => setLoginView('SELECTION')} className="absolute -top-10 right-0 text-gray-500 hover:text-gray-800 font-bold text-xs bg-gray-100 px-2 py-1 rounded">إلغاء</button>
-                                <h3 className="text-center font-bold text-gray-700">دخول المبرمج</h3>
-                                <input 
-                                    type="password"
-                                    placeholder="كلمة المرور"
-                                    className="w-full p-2 border rounded text-center"
-                                    value={adminPassword}
-                                    onChange={e => setAdminPassword(e.target.value)}
-                                />
-                                {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
-                                <Button variant="danger" type="submit" className="w-full">دخول المسؤول</Button>
-                            </form> 
-                        )}
-                        </div>
-                    </>
-                ) : (
-                    <div className="animate-fade-in">
-                        <h3 className="text-xl font-bold text-center mb-2 text-emerald-800">إكمال البيانات</h3>
-                        <p className="text-sm text-gray-500 text-center mb-6">يرجى إدخال رقم الهاتف لمرة واحدة فقط، لتمكين المحفظ من التواصل معكم.</p>
-                        <form onSubmit={handleCompleteParentProfile} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">رقم هاتف ولي الأمر</label>
-                                <input 
-                                    type="tel"
-                                    placeholder="01xxxxxxxxx"
-                                    className="w-full p-5 border-2 border-gray-200 rounded-2xl text-center text-4xl font-black tracking-[0.2em] text-emerald-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition shadow-sm placeholder:text-gray-300 h-20"
-                                    value={parentPhoneInput}
-                                    onChange={(e) => setParentPhoneInput(e.target.value)}
-                                />
-                            </div>
-                            {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
-                            <Button type="submit" className="w-full">حفظ ودخول</Button>
-                            <Button type="button" variant="outline" onClick={handleLogout} className="w-full">إلغاء</Button>
-                        </form>
-                    </div>
-                )}
+                                   <div className="pt-6 text-center">
+                                       <button onClick={() => setLoginView('ADMIN')} className="text-xs text-mutedBrown hover:text-darkBrown font-bold transition flex items-center justify-center gap-1 mx-auto bg-white/50 px-3 py-1 rounded-full">
+                                           <span>🔐</span> الدخول للإدارة
+                                       </button>
+                                       
+                                       <div className="mt-8 flex justify-center opacity-40">
+                                            <div className="text-center">
+                                                <p className="font-serif text-2xl text-darkBrown">{orgSettings.name}</p>
+                                                <p className="text-[10px] text-mutedBrown mt-1">وفقكم الله لكل خير</p>
+                                            </div>
+                                       </div>
+                                   </div>
+                               </div>
+                           )}
+
+                           {/* PARENT LOGIN FORM */}
+                           {loginView === 'PARENT' && (
+                               <form onSubmit={handleParentLogin} className="space-y-5 animate-slide-up">
+                                   <div className="flex items-center mb-6">
+                                       <button type="button" onClick={() => setLoginView('SELECTION')} className="bg-texture hover:bg-gray-300 text-darkBrown w-10 h-10 rounded-full flex items-center justify-center transition shadow-sm border border-darkBrown/10">
+                                           <span className="text-xl font-bold">➜</span>
+                                       </button>
+                                       <h3 className="flex-1 text-center font-bold font-serif text-darkBrown text-2xl">دخول ولي الأمر</h3>
+                                       <div className="w-10"></div>
+                                   </div>
+                                   <div>
+                                       <label className="block text-xs font-bold text-mutedBrown mb-2">اسم الشيخ (المحفظ)</label>
+                                       <div className="relative">
+                                           <select 
+                                           className="w-full p-4 border-2 border-texture rounded-2xl bg-white focus:border-primary focus:ring-0 outline-none transition appearance-none text-darkBrown font-bold text-lg"
+                                           value={parentSelectedTeacher}
+                                           onChange={(e) => setParentSelectedTeacher(e.target.value)}
+                                           >
+                                           <option value="">-- اضغط للاختيار --</option>
+                                           {teachers.map(t => (
+                                               <option key={t.id} value={t.id}>{t.name}</option>
+                                           ))}
+                                           </select>
+                                           <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-mutedBrown text-xs">▼</div>
+                                       </div>
+                                   </div>
+                                   <div>
+                                   <label className="block text-xs font-bold text-mutedBrown mb-2">كود الطالب</label>
+                                   <input 
+                                       type="text"
+                                       placeholder="رقم الطالب"
+                                       className="w-full p-4 border-2 border-texture rounded-2xl text-center text-xl tracking-widest focus:border-primary focus:ring-0 outline-none transition bg-white text-darkBrown font-serif placeholder:text-gray-300"
+                                       value={parentCodeInput}
+                                       onChange={(e) => setParentCodeInput(e.target.value)}
+                                   />
+                                   </div>
+                                   {loginError && <p className="text-red-600 text-sm text-center font-bold bg-red-50 p-3 rounded-xl border border-red-100">{loginError}</p>}
+                                   <button type="submit" className="w-full text-xl bg-primary hover:bg-primaryDark text-white font-bold py-4 rounded-2xl shadow-card hover:shadow-lg transition font-serif transform active:scale-95">تسجيل الدخول</button>
+                               </form>
+                           )}
+
+                           {/* TEACHER LOGIN FORM */}
+                           {loginView === 'TEACHER' && (
+                               <form onSubmit={handleTeacherLogin} className="space-y-5 animate-slide-up">
+                                   <div className="flex items-center mb-6">
+                                       <button type="button" onClick={() => setLoginView('SELECTION')} className="bg-texture hover:bg-gray-300 text-darkBrown w-10 h-10 rounded-full flex items-center justify-center transition shadow-sm border border-darkBrown/10">
+                                           <span className="text-xl font-bold">➜</span>
+                                       </button>
+                                       <h3 className="flex-1 text-center font-bold font-serif text-darkBrown text-2xl">دخول المعلم</h3>
+                                       <div className="w-10"></div>
+                                   </div>
+                                   <div>
+                                       <label className="block text-xs font-bold text-mutedBrown mb-2">اسم المعلم</label>
+                                       <div className="relative">
+                                           <select 
+                                           className="w-full p-4 border-2 border-texture rounded-2xl bg-white focus:border-secondary focus:ring-0 outline-none transition appearance-none text-darkBrown font-bold text-lg"
+                                           value={selectedTeacherId}
+                                           onChange={(e) => setSelectedTeacherId(e.target.value)}
+                                           >
+                                           <option value="">-- اضغط للاختيار --</option>
+                                           {teachers.map(t => (
+                                               <option key={t.id} value={t.id}>{t.name}</option>
+                                           ))}
+                                           </select>
+                                           <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-mutedBrown text-xs">▼</div>
+                                       </div>
+                                   </div>
+                                   <div>
+                                       <label className="block text-xs font-bold text-mutedBrown mb-2">الرقم السري</label>
+                                       <input 
+                                           type="password"
+                                           className="w-full p-4 border-2 border-texture rounded-2xl text-center focus:border-secondary focus:ring-0 outline-none font-mono bg-white text-darkBrown text-xl placeholder:text-gray-300"
+                                           value={teacherCodeInput}
+                                           onChange={(e) => setTeacherCodeInput(e.target.value)}
+                                           placeholder="******"
+                                       />
+                                   </div>
+                                   {loginError && <p className="text-red-600 text-sm text-center font-bold bg-red-50 p-3 rounded-xl border border-red-100">{loginError}</p>}
+                                   <button type="submit" className="w-full text-xl bg-secondary hover:bg-secondaryDark text-white font-bold py-4 rounded-2xl shadow-card hover:shadow-lg transition font-serif transform active:scale-95" disabled={!selectedTeacherId}>
+                                       تسجيل الدخول
+                                   </button>
+                               </form>
+                           )}
+
+                           {/* ADMIN LOGIN */}
+                           {loginView === 'ADMIN' && (
+                               <form onSubmit={handleAdminLogin} className="space-y-4 animate-slide-up relative border-t pt-4 mt-4 dark:border-gray-600">
+                                   <button type="button" onClick={() => setLoginView('SELECTION')} className="absolute -top-10 right-0 text-gray-500 hover:text-gray-800 font-bold text-xs bg-gray-100 px-2 py-1 rounded dark:bg-gray-700 dark:text-gray-300">إلغاء</button>
+                                   <h3 className="text-center font-bold text-gray-700 dark:text-white">دخول المبرمج</h3>
+                                   <input 
+                                       type="password"
+                                       placeholder="كلمة المرور"
+                                       className="w-full p-2 border rounded text-center dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                       value={adminPassword}
+                                       onChange={e => setAdminPassword(e.target.value)}
+                                   />
+                                   {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
+                                   <Button variant="danger" type="submit" className="w-full">دخول المسؤول</Button>
+                               </form> 
+                           )}
+                       </div>
+                   ) : (
+                       <div className="animate-fade-in space-y-6">
+                           <div className="text-center">
+                                <h3 className="text-xl font-bold mb-2 font-serif text-darkBrown">إكمال البيانات</h3>
+                                <p className="text-sm text-mutedBrown">يرجى إدخال رقم الهاتف لمرة واحدة فقط.</p>
+                           </div>
+                           <form onSubmit={handleCompleteParentProfile} className="space-y-4">
+                               <div>
+                                   <label className="block text-xs font-bold text-mutedBrown mb-2">رقم هاتف ولي الأمر</label>
+                                   <input 
+                                       type="tel"
+                                       placeholder="01xxxxxxxxx"
+                                       className="w-full p-5 border-2 border-texture rounded-2xl text-center text-4xl font-black tracking-[0.2em] text-darkBrown focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition shadow-sm placeholder:text-gray-200 h-20 bg-white"
+                                       value={parentPhoneInput}
+                                       onChange={(e) => setParentPhoneInput(e.target.value)}
+                                   />
+                               </div>
+                               {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
+                               <div className="flex flex-col gap-3">
+                                   <button type="submit" className="w-full bg-primary hover:bg-primaryDark text-white font-bold py-4 rounded-xl shadow-md transition font-serif text-lg">حفظ ودخول</button>
+                                   <button type="button" onClick={handleLogout} className="w-full bg-transparent border-2 border-texture text-mutedBrown font-bold py-3 rounded-xl hover:bg-texture transition">إلغاء</button>
+                               </div>
+                           </form>
+                       </div>
+                   )}
+                </div>
 
                 {deferredPrompt && (
-                  <div className="mt-6 text-center animate-bounce">
-                    <Button onClick={handleInstallClick} className="w-full bg-emerald-800 hover:bg-emerald-900 shadow-lg border border-emerald-400">
-                      📲 تثبيت التطبيق (أندرويد)
+                  <div className="mt-8 text-center animate-bounce px-4">
+                    <Button onClick={handleInstallClick} className="w-full bg-darkBrown hover:bg-black shadow-lg text-white py-4 rounded-xl text-lg font-serif border border-white/20">
+                      📲 تثبيت التطبيق
                     </Button>
                   </div>
                 )}
-                
-                {isIOS && !deferredPrompt && (
-                    <div className="mt-6 text-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <p className="text-xs text-gray-600 font-bold mb-1">لتثبيت التطبيق على الآيفون:</p>
-                        <p className="text-xs text-gray-500">اضغط على زر المشاركة <span className="text-lg">⎋</span> ثم اختر "Add to Home Screen" (إضافة للشاشة الرئيسية)</p>
-                    </div>
-                )}
-            </div>
-            
-            <div className="mt-6 text-center text-emerald-800/50 text-sm">
-                <p>يعمل التطبيق بدون إنترنت. يتم حفظ البيانات على الهاتف.</p>
-            </div>
+              </div>
             </div>
         )}
       </>

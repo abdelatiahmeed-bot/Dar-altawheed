@@ -91,6 +91,15 @@ export interface FeeReminder {
     dateSet: string;
 }
 
+// NEW: Badge Interface
+export interface Badge {
+    id: string;
+    name: string;
+    icon: string;
+    description: string;
+    dateEarned: string;
+}
+
 export interface Student {
   id: string;
   teacherId: string; 
@@ -105,7 +114,8 @@ export interface Student {
     murajaah: QuranAssignment[];
   }; 
   calculatorNotes?: string; 
-  feeReminder?: FeeReminder; 
+  feeReminder?: FeeReminder;
+  badges?: Badge[]; // New: Array of earned badges
 }
 
 export interface Teacher {

@@ -1,5 +1,5 @@
 {
-  "name": "الاصلى-of-the-basic-of-dar-al-tawheed---quran-tracker",
+  "name": "دار-التوحيد-النسخة-التجريبية",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -13,6 +13,7 @@
     "@google/genai": "^1.30.0",
     "react": "^19.2.0",
     "recharts": "^3.4.1",
+    "canvas-confetti": "1.6.0",
     "firebase": "^12.6.0"
   },
   "devDependencies": {

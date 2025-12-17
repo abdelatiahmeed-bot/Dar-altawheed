@@ -1,7 +1,7 @@
 
 import { Student, Grade, Teacher, Announcement, DailyLog, QuranAssignment } from './types';
 
-export const APP_VERSION = "2.9.6"; // Bump version
+export const APP_VERSION = "2.9.8"; // Bump version
 
 export const MONTHS_LIST = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -10,6 +10,26 @@ export const MONTHS_LIST = [
 
 export const DAYS_OF_WEEK = [
   "السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"
+];
+
+// NEW: Available Badge Types Expanded
+export const BADGE_TYPES = [
+    // أوسمة الإنجاز (الحفظ)
+    { id: 'b_khatma_juz', name: 'ختمة جزء', icon: '🏆', description: 'إتمام حفظ جزء كامل', category: 'ACHIEVEMENT' },
+    { id: 'b_iron_memory', name: 'الذاكرة الحديدية', icon: '🧠', description: 'تسميع بدون أي خطأ', category: 'ACHIEVEMENT' },
+    { id: 'b_speed', name: 'سريع الحفظ', icon: '⚡', description: 'إنجاز الحفظ في وقت قياسي', category: 'ACHIEVEMENT' },
+    { id: 'b_golden_throat', name: 'الحنجرة الذهبية', icon: '🎙️', description: 'جمال الصوت وإتقان الأحكام', category: 'ACHIEVEMENT' },
+    { id: 'b_excellent', name: 'وسام التميز', icon: '👑', description: 'الحصول على تقدير ممتاز 5 مرات', category: 'ACHIEVEMENT' },
+
+    // أوسمة السلوك والمواظبة
+    { id: 'b_mosque', name: 'محب المسجد', icon: '🕌', description: 'الحضور قبل الموعد', category: 'BEHAVIOR' },
+    { id: 'b_helper', name: 'المساعد الصغير', icon: '🤝', description: 'مساعدة الشيخ والزملاء', category: 'BEHAVIOR' },
+    { id: 'b_peacemaker', name: 'الحمامة البيضاء', icon: '🕊️', description: 'الهدوء والأدب في الحلقة', category: 'BEHAVIOR' },
+    { id: 'b_adab', name: 'نجم الآداب', icon: '🌟', description: 'التفاعل في درس الآداب', category: 'BEHAVIOR' },
+
+    // أوسمة التحدي
+    { id: 'b_flame', name: 'شعلة الأسبوع', icon: '🔥', description: 'حضور أسبوع كامل دون غياب', category: 'CHALLENGE' },
+    { id: 'b_persistent', name: 'المثابر', icon: '🧗', description: 'تحسن ملحوظ في المستوى', category: 'CHALLENGE' },
 ];
 
 const MOCK_ADAB_QUESTIONS = [
@@ -346,7 +366,8 @@ const generateMockData = () => {
                 })),
                 payments: [],
                 logs: generateLogsForStudent(tId, `الشيخ ${FIRST_NAMES[t-1] || 'محمد'}`),
-                nextPlan: undefined
+                nextPlan: undefined,
+                badges: []
             });
         }
     }
