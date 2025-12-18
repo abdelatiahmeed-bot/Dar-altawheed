@@ -1,7 +1,7 @@
 
 import { Student, Grade, Teacher, Announcement, DailyLog, QuranAssignment } from './types';
 
-export const APP_VERSION = "2.9.8"; // Bump version
+export const APP_VERSION = "2.9.9"; // Bump version
 
 export const MONTHS_LIST = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -30,14 +30,6 @@ export const BADGE_TYPES = [
     // أوسمة التحدي
     { id: 'b_flame', name: 'شعلة الأسبوع', icon: '🔥', description: 'حضور أسبوع كامل دون غياب', category: 'CHALLENGE' },
     { id: 'b_persistent', name: 'المثابر', icon: '🧗', description: 'تحسن ملحوظ في المستوى', category: 'CHALLENGE' },
-];
-
-const MOCK_ADAB_QUESTIONS = [
-  { q: "ما هو حق المسلم على المسلم؟", c: "رد السلام", w: ["تجاهله", "مقاطعته"] },
-  { q: "كيف نبر الوالدين؟", c: "بالطاعة والإحسان", w: ["برفع الصوت", "بالعقوق"] },
-  { q: "من هو خاتم الأنبياء؟", c: "محمد صلى الله عليه وسلم", w: ["عيسى عليه السلام", "موسى عليه السلام"] },
-  { q: "ماذا نقول عند العطس؟", c: "الحمد لله", w: ["سبحان الله", "أستغفر الله"] },
-  { q: "ما هي عقوبة الكذب؟", c: "يحيق بصاحبه", w: ["ينجيه", "يرفع شأنه"] }
 ];
 
 export const SURAH_DATA = [
@@ -138,8 +130,8 @@ export const SURAH_DATA = [
   { name: "التين", count: 8, juz: 30 },
   { name: "العلق", count: 19, juz: 30 },
   { name: "القدر", count: 5, juz: 30 },
-  { name: "الزلزلة", count: 8, juz: 30 },
-  { name: "البينة", count: 8, juz: 30 },
+  { name: "البينة", count: 8, juz: 30 }, // Fixed Position
+  { name: "الزلزلة", count: 8, juz: 30 }, // Fixed Position
   { name: "العاديات", count: 11, juz: 30 },
   { name: "القارعة", count: 11, juz: 30 },
   { name: "التكاثر", count: 8, juz: 30 },
@@ -261,6 +253,14 @@ const getRandomGrade = (): Grade => {
 };
 
 // --- MOCK DATA ---
+// Added MOCK_ADAB_QUESTIONS to resolve "Cannot find name" errors
+const MOCK_ADAB_QUESTIONS = [
+  { q: "ما هو أدب الاستئذان؟", c: "أن نستأذن ثلاثاً", w: ["أن ندخل مباشرة", "أن نصرخ بصوت عالٍ"] },
+  { q: "ماذا نقول عند البدء بالأكل؟", c: "بسم الله", w: ["الحمد لله", "سبحان الله"] },
+  { q: "كيف نتعامل مع الزملاء؟", c: "بالرفق والأدب", w: ["بالصراخ", "بالتجاهل"] },
+  { q: "ما هو فضل بر الوالدين؟", c: "رضا الله من رضا الوالدين", w: ["ليس له فضل", "أمر ثانوي"] }
+];
+
 const FIRST_NAMES = ["أحمد", "محمد", "عمر", "يوسف", "علي", "إبراهيم", "خالد", "حسن"];
 const MIDDLE_NAMES = ["محمود", "سيد", "أحمد", "علي", "مصطفى"];
 const LAST_NAMES = ["المصري", "النجار", "السيد", "عامر", "سليم"];
@@ -307,7 +307,8 @@ const generateLogsForStudent = (teacherId: string, teacherName: string): DailyLo
                     title: "مجلس آداب عام",
                     quizzes: [
                         { id: 'q1', question: mockQ1.q, correctAnswer: mockQ1.c, wrongAnswers: mockQ1.w },
-                        { id: 'q2', question: mockQ2.q, correctAnswer: mockQ2.c, wrongAnswers: mockQ1.w }
+                        // Fixed: used mockQ2.w instead of mockQ1.w
+                        { id: 'q2', question: mockQ2.q, correctAnswer: mockQ2.c, wrongAnswers: mockQ2.w }
                     ]
                 },
                 parentQuizScore: Math.random() > 0.5 ? 2 : 1, 

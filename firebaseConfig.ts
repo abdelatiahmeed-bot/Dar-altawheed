@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBy9-kDy0JnunaSubLm-VhliTGhP2jZs6o",
@@ -13,9 +14,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// هذا التعديل الجديد: تفعيل الكاش ليعمل أوفلاين ويرسل البيانات لاحقاً
+// تفعيل الحفظ المحلي (Offline Persistence)
+// هذا يضمن حفظ البيانات عند انقطاع النت ورفعها عند عودته
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   })
 });
+
+export const auth = getAuth(app);
